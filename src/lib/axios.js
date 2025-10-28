@@ -2,11 +2,17 @@ import axios from "axios";
 import { getToken, removeToken } from "./authUtils";
 
 const baseURL =
-  (process.env.NEXT_PUBLIC_API_BASE_URL || "").replace(/\/$/, "") || "";
+  (
+    process.env.NEXT_PUBLIC_API_BASE_URL ||
+    "https://granitic-jule-haunting.ngrok-free.dev"
+  ).replace(/\/$/, "") || "";
 
 const api = axios.create({
   baseURL,
-  headers: { "Content-Type": "application/json" },
+  headers: {
+    "Content-Type": "application/json",
+    "ngrok-skip-browser-warning": "true",
+  },
   withCredentials: true,
 });
 
