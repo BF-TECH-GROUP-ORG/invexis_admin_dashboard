@@ -16,7 +16,7 @@ export default function DashboardLayout({ children }) {
         }`}
       >
         <TopNavBar expanded={expanded} />
-        <main className="min-h-screen p-4 bg-gray-50">{children}</main>
+        <main className="min-h-screen mt-30 p-6">{children}</main>
       </div>
     </div>
   );

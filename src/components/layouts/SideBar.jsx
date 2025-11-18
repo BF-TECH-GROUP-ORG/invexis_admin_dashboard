@@ -15,42 +15,52 @@ import {
   ChevronDown,
   Upload,
   Unlock,
+  Tag,
+  LogOut,
 } from "lucide-react";
 
 const navItems = [
   {
     title: "Dashboard",
     icon: <LayoutDashboard size={22} />,
-    path: "/admin/dashboard",
+    path: "/",
   },
 
   {
-    title: "Clients",
+    title: "Companies",
     icon: <Users size={22} />,
     children: [
-      { title: "All Clients", path: "/admin/clients" },
-      { title: "Add New", path: "/admin/clients/new" },
-      { title: "Bulk Import", path: "/admin/clients/bulk" },
-      { title: "Unlock Accounts", path: "/admin/clients/unlock" },
+      { title: "All Companies", path: "/clients/list" },
+      { title: "Add New Company", path: "/clients/new" },
+      { title: "Bulk Import", path: "/clients/bulk" },
+      { title: "Unlock Accounts", path: "/clients/unlock" },
     ],
   },
 
   {
-    title: "Consents & Compliance",
-    icon: <ShieldCheck size={22} />,
-    path: "/admin/consents",
+    title: "Users",
+    icon: <UserPlus size={22} />,
+    children: [
+      { title: "All Users", path: "/users/list" },
+      { title: "Add New User", path: "/users/new" },
+      { title: "User Activations", path: "/users/activations" },
+      { title: "User Locking", path: "/users/locking" },
+    ],
+  },
+
+  {
+    title: "Categories",
+    icon: <Tag size={22} />,
+    children: [
+      { title: "All Categories", path: "/categories/list" },
+      { title: "Add New Categories", path: "/categories/new" },
+    ],
   },
 
   {
     title: "Reports",
     icon: <FileSpreadsheet size={22} />,
-    path: "/admin/reports",
-  },
-
-  {
-    title: "Settings",
-    icon: <Settings size={22} />,
-    path: "/admin/settings",
+    path: "/reports",
   },
 ];
 
@@ -66,6 +76,7 @@ export default function SideBar({
   const [openMenus, setOpenMenus] = useState([]);
   const [hoverMenu, setHoverMenu] = useState(null);
   const [hoverPosition, setHoverPosition] = useState({ top: 0 });
+  const [hoverMenuOpen, setHoverMenuOpen] = useState(false);
   const pathname = usePathname();
 
   useEffect(() => {
@@ -95,11 +106,24 @@ export default function SideBar({
       const rect = e.currentTarget.getBoundingClientRect();
       setHoverMenu(item.title);
       setHoverPosition({ top: rect.top });
+      setHoverMenuOpen(true);
     }
   };
 
   const handleHoverLeave = () => {
-    if (!expanded) setHoverMenu(null);
+    if (!expanded) {
+      setHoverMenuOpen(false);
+      // Don't immediately clear hoverMenu - let it stay until menu mouse leaves
+    }
+  };
+
+  const handleMenuMouseEnter = () => {
+    setHoverMenuOpen(true);
+  };
+
+  const handleMenuMouseLeave = () => {
+    setHoverMenuOpen(false);
+    setHoverMenu(null);
   };
 
   return (
@@ -110,7 +134,7 @@ export default function SideBar({
         }`}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-3 py-4 border-b border-gray-200">
+        <div className="flex items-center justify-between px-3 py-4 border-b border-gray-200 flex-shrink-0">
           <div className="flex items-center gap-3 overflow-hidden">
             <button
               aria-label="toggle sidebar"
@@ -127,35 +151,41 @@ export default function SideBar({
           </div>
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto scrollbar-none px-2 py-3 text-gray-900">
-          <h3
-            className={`text-xs font-semibold text-gray-400 px-3 mb-2 transition-opacity duration-300 ${
-              expanded ? "opacity-100" : "opacity-0"
-            }`}
-          >
-            OVERVIEW
-          </h3>
-
+        {/* Navigation - Centered */}
+        <nav className="flex-1 flex flex-col overflow-y-auto scrollbar-none mb-10 px-2 py-3 text-gray-900">
           {navItems.map((item) => (
             <div
               key={item.title}
               onMouseEnter={(e) => handleHoverEnter(e, item)}
               onMouseLeave={handleHoverLeave}
+              className="mb-2"
             >
               <div
-                className={`flex items-center justify-between px-3 py-2 rounded-lg hover:bg-[#081422]/10 cursor-pointer transition-all ${
-                  pathname === item.path
-                    ? "bg-[#081422] text-white font-semibold"
-                    : "text-gray-700"
+                className={`flex items-center justify-between px-3 py-2 rounded-r-lg hover:bg-[#ff782d]/10 cursor-pointer transition-all border-l-4 ${
+                  pathname === item.path ||
+                  (item.children &&
+                    item.children.some((child) => pathname === child.path))
+                    ? "border-l-[#ff782d] bg-[#ff782d]/5 text-[#ff782d] font-semibold"
+                    : "border-l-transparent text-gray-700 hover:text-[#ff782d]"
                 }`}
                 onClick={() =>
                   expanded && item.children && toggleMenu(item.title)
                 }
               >
                 <div className="flex items-center gap-3 overflow-hidden">
-                  {item.icon}
-                  {expanded && <span>{item.title}</span>}
+                  {item.path ? (
+                    <Link href={item.path}>
+                      <span className="flex items-center gap-3 overflow-hidden">
+                        {item.icon}
+                        {expanded && <span>{item.title}</span>}
+                      </span>
+                    </Link>
+                  ) : (
+                    <span className="flex items-center gap-3 overflow-hidden">
+                      {item.icon}
+                      {expanded && <span>{item.title}</span>}
+                    </span>
+                  )}
                 </div>
 
                 {item.children && expanded && (
@@ -175,10 +205,10 @@ export default function SideBar({
                     <Link
                       key={child.title}
                       href={child.path}
-                      className={`text-left px-3 py-1 text-sm rounded transition-colors ${
+                      className={`text-left px-3 py-2 text-sm rounded transition-colors border-l-4 ${
                         pathname === child.path
-                          ? "bg-[#081422]/10 text-[#081422] font-semibold"
-                          : "text-gray-500 hover:bg-[#081422]/5 hover:text-[#081422]"
+                          ? "border-l-[#ff782d] bg-[#ff782d]/5 text-[#ff782d] font-semibold"
+                          : "border-l-transparent text-gray-500 hover:bg-[#ff782d]/5 hover:text-[#ff782d]"
                       }`}
                     >
                       {child.title}
@@ -189,15 +219,34 @@ export default function SideBar({
             </div>
           ))}
         </nav>
+
+        {/* Logout Button */}
+        <div className="border-t border-gray-200 px-2 py-3 flex-shrink-0">
+          <button
+            className="w-full flex items-center justify-center gap-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors duration-200"
+            title={expanded ? "Logout" : "Logout"}
+          >
+            <LogOut size={22} />
+            {expanded && <span className="font-medium">Logout</span>}
+          </button>
+        </div>
       </aside>
 
       {/* Hover menu for collapsed sidebar */}
       {hoverMenu &&
         !expanded &&
+        (hoverMenuOpen || hoverMenu) &&
         createPortal(
           <div
-            style={{ position: "fixed", top: hoverPosition.top, left: "80px" }}
-            className="w-48 bg-white border rounded-lg py-2 z-50 shadow-md"
+            style={{
+              position: "fixed",
+              top: hoverPosition.top,
+              left: "80px",
+              zIndex: 40,
+            }}
+            className="w-48 bg-white border border-gray-200 rounded-lg py-2 shadow-lg"
+            onMouseEnter={handleMenuMouseEnter}
+            onMouseLeave={handleMenuMouseLeave}
           >
             <div className="px-3 pb-2 border-b text-sm font-bold text-gray-700">
               {hoverMenu}
@@ -208,10 +257,10 @@ export default function SideBar({
                 <Link
                   key={child.title}
                   href={child.path}
-                  className={`block px-3 py-2 text-sm hover:bg-gray-100 ${
+                  className={`block px-3 py-2 text-sm transition-colors cursor-pointer ${
                     pathname === child.path
-                      ? "bg-[#081422]/10 text-[#081422] font-semibold"
-                      : "text-gray-700"
+                      ? "bg-[#ff782d]/15 text-[#ff782d] font-semibold hover:bg-[#ff782d]/20"
+                      : "text-gray-700 hover:bg-gray-100 hover:text-[#081422]"
                   }`}
                 >
                   {child.title}

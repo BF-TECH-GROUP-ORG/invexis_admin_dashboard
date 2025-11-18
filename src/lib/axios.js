@@ -3,8 +3,9 @@ import { getToken, removeToken } from "./authUtils";
 
 const baseURL =
   (
-    process.env.NEXT_PUBLIC_API_BASE_URL ||
-    "https://granitic-jule-haunting.ngrok-free.dev"
+    //https://granitic-jule-haunting.ngrok-free.dev
+    // process.env.NEXT_PUBLIC_API_BASE_URL ||
+    "https://ea407751ef3e.ngrok-free.app"
   ).replace(/\/$/, "") || "";
 
 const api = axios.create({
@@ -13,7 +14,7 @@ const api = axios.create({
     "Content-Type": "application/json",
     "ngrok-skip-browser-warning": "true",
   },
-  withCredentials: true,
+  withCredentials: false,
 });
 
 /* Attach token from localStorage to every request */

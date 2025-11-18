@@ -1,7 +1,7 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "@/styles/globals.css";
 import LayoutWrapper from "@/components/layouts/LayoutWrapper";
-import { ThemeRegistry } from "@/providers/ThemeRegistry";
+import ThemeRegistry from "@/providers/ThemeRegistry";
 import ClientProviders from "@/providers/ClientProviders";
 import ProtectedRoute from "@/providers/ProtectedRoute";
 import { SidebarProvider } from "@/contexts/SidebarContext";
@@ -20,9 +20,9 @@ export default function RootLayout({ children }) {
       <body className={`font-metropolis antialiased`}>
         <ClientProviders>
           <SidebarProvider>
-            <ProtectedRoute>
+            <LayoutWrapper>
               <ThemeRegistry>{children}</ThemeRegistry>
-            </ProtectedRoute>
+            </LayoutWrapper>
           </SidebarProvider>
         </ClientProviders>
       </body>

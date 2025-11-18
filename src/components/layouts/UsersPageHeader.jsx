@@ -16,12 +16,13 @@ export default function UsersPageHeader({ onAddUser }) {
           fontSize: 14,
           color: "#7a7a7a",
           mb: 1,
+          ml: 1
         }}
       >
         <Link
           underline="hover"
           color="#7a7a7a"
-          href="/dashboard"
+          href="/"
           sx={{
             fontWeight: 500,
             "&:hover": { color: "#081422" },
@@ -32,13 +33,13 @@ export default function UsersPageHeader({ onAddUser }) {
         <Link
           underline="hover"
           color="#7a7a7a"
-          href="/dashboard/workers"
+          href="/clients"
           sx={{
             fontWeight: 500,
             "&:hover": { color: "#081422" },
           }}
         >
-          Workers
+          clients
         </Link>
         <Typography color="#081422" fontWeight={600}>
           List
@@ -53,9 +54,10 @@ export default function UsersPageHeader({ onAddUser }) {
             fontWeight: 600,
             color: "#081422",
             fontFamily: "Metropolis, sans-serif",
+            ml: 1,
           }}
         >
-          Workers List
+          Company List
         </Typography>
 
         <Button
@@ -76,7 +78,7 @@ export default function UsersPageHeader({ onAddUser }) {
             },
           }}
         >
-          Add Worker
+          Add Company
         </Button>
       </Box>
     </Box>

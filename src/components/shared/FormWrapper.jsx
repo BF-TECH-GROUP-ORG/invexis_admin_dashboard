@@ -13,7 +13,7 @@ import {
 } from "@mui/material";
 import {
   HiArrowRight,
-  HiCog,
+  HiCog6Tooth,
   HiEye,
   HiDevicePhoneMobile,
   HiKey,
@@ -103,7 +103,7 @@ export default function FormWrapper({
             height: "50px",
           }}
         >
-          <HiCog />
+          <HiCog6Tooth />
         </IconButton>
       </div>
 

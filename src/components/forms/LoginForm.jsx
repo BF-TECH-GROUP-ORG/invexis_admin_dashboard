@@ -29,8 +29,6 @@ export default function LoginForm() {
     e.preventDefault();
     setError("");
     setSubmitting(true);
-    console.log("Submitting formData:", formData);
-    alert(JSON.stringify(formData));
 
     try {
       const { data } = await login(formData);
