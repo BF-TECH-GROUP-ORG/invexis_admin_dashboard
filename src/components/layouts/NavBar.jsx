@@ -14,26 +14,44 @@ export default function TopNavBar({ expanded = true }) {
     profileImage: "/images/user3.jpg",
   };
 
-  const [notifications] = useState([
+  const [notifications, setNotifications] = useState([
     {
       id: 1,
       title: "Invoice",
       desc: "Boost efficiency, save time & money",
       time: "9:50 AM",
+      unread: true,
+      full: "Full message for Invoice notification.",
     },
     {
       id: 2,
       title: "Project Update",
       desc: "New version deployed successfully",
       time: "10:15 AM",
+      unread: true,
+      full: "Full message for Project Update notification.",
     },
     {
       id: 3,
       title: "Team Meeting",
       desc: "Scheduled for tomorrow 9:00 AM",
       time: "2:00 PM",
+      unread: true,
+      full: "Full message for Team Meeting notification.",
     },
   ]);
+
+  const unreadCount = notifications.filter((n) => n.unread).length;
+
+  const handleMarkRead = (id) => {
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, unread: false } : n))
+    );
+  };
+
+  const handleMarkAllRead = () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })));
+  };
 
   const [profileOpen, setProfileOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -78,20 +96,22 @@ export default function TopNavBar({ expanded = true }) {
           {/* Notifications */}
           <div className="relative">
             <button
-              className="relative p-2 rounded-full border-2 border-gray-200 hover:border-orange-300 transition"
-              onClick={() => setNotifOpen(true)}
+              className="relative p-3 rounded-full border-2 border-gray-200 hover:border-orange-300 transition"
+              onClick={() => setNotifOpen((s) => !s)}
               aria-label="Notifications"
             >
               <Bell className="w-6 h-6 text-gray-600 hover:text-orange-500" />
-              {notifications.length > 0 && (
-                <span className="absolute top-0 right-0 w-3 h-3 bg-red-500 rounded-full" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-0.5 -right-[-1.5px] min-w-[0.7rem] h-[11px] w-3 px-0.5 flex items-center justify-center text-[10px] bg-red-500 text-white rounded-full">
+                  {/* {unreadCount > 9 ? "9+" : unreadCount} */}
+                </span>
               )}
             </button>
           </div>
 
           {/* Settings */}
           <button
-            className="p-2 rounded-full border-2 border-gray-200 hover:border-orange-300 transition hidden md:flex items-center justify-center"
+            className="p-3 rounded-full border-2 border-gray-200 hover:border-orange-300 transition hidden md:flex items-center justify-center"
             aria-label="Settings"
           >
             <Settings className="w-6 h-6 text-gray-600 hover:text-orange-500" />
@@ -268,7 +288,14 @@ export default function TopNavBar({ expanded = true }) {
       </AnimatePresence>
 
       {/* ======= NOTIFICATION SIDEBAR ======= */}
-      <NotificationSideBar expanded={expanded} />
+      <NotificationSideBar
+        expanded={expanded}
+        isOpen={notifOpen}
+        onClose={() => setNotifOpen(false)}
+        notifications={notifications}
+        onMarkRead={handleMarkRead}
+        onMarkAll={handleMarkAllRead}
+      />
     </>
   );
 }

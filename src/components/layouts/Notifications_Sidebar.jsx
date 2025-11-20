@@ -3,40 +3,19 @@ import { useState } from "react";
 import { X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-function NotificationSideBar({ expanded = true }) {
-  const [notifications, setNotifications] = useState([
-    {
-      id: 1,
-      title: "Invoice",
-      desc: "Boost efficiency, save time & money",
-      time: "9:50 AM",
-      unread: true,
-      full: "Full message for Invoice notification.",
-    },
-    {
-      id: 2,
-      title: "Project Update",
-      desc: "New version deployed successfully",
-      time: "10:15 AM",
-      unread: true,
-      full: "Full message for Project Update notification.",
-    },
-    {
-      id: 3,
-      title: "Team Meeting",
-      desc: "Scheduled for tomorrow 9:00 AM",
-      time: "2:00 PM",
-      unread: true,
-      full: "Full message for Team Meeting notification.",
-    },
-  ]);
-  const [notifOpen, setNotifOpen] = useState(false);
+function NotificationSideBar({
+  expanded = true,
+  isOpen = false,
+  onClose = () => {},
+  notifications = [],
+  onMarkRead = () => {},
+  onMarkAll = () => {},
+}) {
   const [activeNotif, setActiveNotif] = useState(null);
-  // ...existing code...
 
   return (
     <AnimatePresence>
-      {notifOpen && (
+      {isOpen && (
         <>
           <motion.div
             initial={{ opacity: 0 }}
@@ -44,7 +23,7 @@ function NotificationSideBar({ expanded = true }) {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}
             className="fixed inset-0 bg-black/50 z-40"
-            onClick={() => setNotifOpen(false)}
+            onClick={() => onClose()}
           />
 
           <motion.div
@@ -56,33 +35,47 @@ function NotificationSideBar({ expanded = true }) {
           >
             <div className="flex items-center justify-between p-5 border-b">
               <h2 className="text-lg font-semibold">Notifications</h2>
-              <button onClick={() => setNotifOpen(false)}>
-                <X className="w-6 h-6 text-gray-600 hover:text-orange-500" />
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  className="text-xs text-gray-500 hover:text-gray-700"
+                  onClick={() => onMarkAll()}
+                  title="Mark all as read"
+                >
+                  Mark all
+                </button>
+                <button onClick={() => onClose()}>
+                  <X className="w-6 h-6 text-gray-600 hover:text-orange-500" />
+                </button>
+              </div>
             </div>
 
             <div className="p-4 space-y-3">
-              {notifications.map((n, idx) => (
+              {notifications.map((n) => (
                 <div
                   key={n.id}
                   className="flex items-center gap-3 p-3 rounded-lg bg-white outline outline-gray-200 hover:bg-gray-100 transition relative cursor-pointer"
                   onClick={() => {
-                    // Mark as read and show popup
-                    setNotifications((prev) =>
-                      prev.map((notif, i) =>
-                        i === idx ? { ...notif, unread: false } : notif
-                      )
-                    );
+                    // Ask parent to mark read and show popup
+                    onMarkRead(n.id);
                     setActiveNotif(n);
                   }}
                 >
-                  <div className="w-12 h-12 bg-gray-300 rounded-lg relative">
+                  <div className="w-12 h-12 bg-gray-300 rounded-lg relative flex items-center justify-center text-white font-bold">
+                    {/* icon / initials */}
+                    <span>{n.title?.charAt(0) ?? "N"}</span>
                     {n.unread && (
                       <span className="absolute top-1 right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white" />
                     )}
                   </div>
                   <div className="flex-1">
-                    <h4 className="font-semibold text-sm">{n.title}</h4>
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-semibold text-sm">{n.title}</h4>
+                      {n.unread && (
+                        <span className="text-[10px] bg-orange-100 text-orange-600 px-2 rounded-full">
+                          NEW
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs text-gray-500">{n.desc}</p>
                   </div>
                   <span className="text-xs text-gray-400">{n.time}</span>

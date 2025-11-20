@@ -42,9 +42,7 @@ const navItems = [
     icon: <UserPlus size={22} />,
     children: [
       { title: "All Users", path: "/users/list" },
-      { title: "Add New User", path: "/users/new" },
-      { title: "User Activations", path: "/users/activations" },
-      { title: "User Locking", path: "/users/locking" },
+      { title: "Add New User", path: "/users/add-new-user" },
     ],
   },
 
@@ -53,7 +51,7 @@ const navItems = [
     icon: <Tag size={22} />,
     children: [
       { title: "All Categories", path: "/categories/list" },
-      { title: "Add New Categories", path: "/categories/new" },
+      { title: "Add New Category", path: "/categories/add-new-category" },
     ],
   },
 
