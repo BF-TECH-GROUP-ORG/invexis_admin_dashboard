@@ -7,8 +7,10 @@ import { HiEye, HiEyeOff, HiArrowRight } from "react-icons/hi";
 import FormWrapper from "../shared/FormWrapper";
 import TermsAndPrivacyPopup from "@/components/layouts/TermsAndPrivacyPopup";
 import { useDispatch } from "react-redux";
-import { setToken } from "@/features/AuthSlice";
+import { setToken, setRefreshToken, setUser } from "@/lib/authUtils";
+import { setAuthData } from "@/features/AuthSlice";
 import { registerSuperAdmin } from "@/services/AuthService";
+import { useNotification } from "@/providers/NotificationProvider";
 
 export default function SuperAdminRegister() {
   const [step, setStep] = useState(1);
@@ -18,6 +20,7 @@ export default function SuperAdminRegister() {
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [showTermsPopup, setShowTermsPopup] = useState(false);
   const dispatch = useDispatch();
+  const { showNotification } = useNotification();
 
   const [formData, setFormData] = useState({
     firstName: "",
@@ -112,14 +115,33 @@ export default function SuperAdminRegister() {
         address: formData.address,
         preferences: formData.preferences,
       };
-      const { data } = await registerSuperAdmin(payload); // [`registerSuperAdmin`](src/services/authService.js)
-      // if API returns token:
-      if (data.token) {
-        dispatch(setToken(data.token)); // [`setToken`](src/store/authSlice.js)
+      const { data } = await registerSuperAdmin(payload); 
+      
+      // if API returns token (auto-login):
+      if (data.token || data.accessToken) {
+        const token = data.token || data.accessToken;
+        setToken(token);
+        
+        if (data.refreshToken) {
+          setRefreshToken(data.refreshToken);
+        }
+        
+        if (data.user) {
+          setUser(data.user);
+          dispatch(setAuthData({ 
+            token: token, 
+            refreshToken: data.refreshToken,
+            user: data.user 
+          }));
+        }
       }
+
       // success UX
       console.log("Registered:", data);
-      alert("Super Admin registered successfully!");
+      showNotification({
+        message: "Super Admin registered successfully!",
+        severity: "success",
+      });
     } catch (err) {
       setError(
         err.response?.data?.message || err.message || "Registration failed."

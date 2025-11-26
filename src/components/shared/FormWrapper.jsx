@@ -21,6 +21,8 @@ import {
 import { HiEyeOff } from "react-icons/hi";
 import { FaGoogle, FaApple } from "react-icons/fa";
 import Link from "next/link";
+import Image from "next/image";
+import googleIcon from "../../../public/images/google_icon.png"
 
 function PasswordField({ field, isPassword }) {
   const [showPassword, setShowPassword] = useState(false);
@@ -208,15 +210,23 @@ export default function FormWrapper({
       <div className="flex justify-center  gap-4 flex-wrap">
         {oauthOptions.includes("google") && (
           <IconButton
-            onClick={() => (window.location.href = "/api/auth/google")}
+            onClick={() => (window.location.href = "https://granitic-jule-haunting.ngrok-free.dev/api/auth/google/signup")}
             sx={{
               borderRadius: "50%",
               border: "1px solid #e0e0e0",
               width: "50px",
               height: "50px",
+              padding: 0,
+              overflow: "hidden"
             }}
           >
-            <FaGoogle className="text-xl text-red-500" />
+             <Image 
+              src={googleIcon} 
+              alt="Google" 
+              width={24} 
+              height={24} 
+              className="object-contain"
+            />
           </IconButton>
         )}
         {oauthOptions.includes("apple") && (

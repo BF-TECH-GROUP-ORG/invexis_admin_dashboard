@@ -172,6 +172,34 @@ export default function ThemeRegistry({ children }) {
           root: { minWidth: "36px", color: lightPalette.text.primary },
         },
       },
+      MuiSnackbar: {
+        styleOverrides: {
+          root: {
+            // Keep snackbar area visually elevated but subtle
+            zIndex: 1400,
+          },
+        },
+      },
+      MuiAlert: {
+        styleOverrides: {
+          standardSuccess: {
+            backgroundColor: "#ecfdf5",
+            color: "#065f46",
+            border: `1px solid rgba(16,185,129,0.12)`,
+          },
+          standardError: {
+            backgroundColor: "#fff1f2",
+            color: "#991b1b",
+            border: `1px solid rgba(220,38,38,0.08)`,
+          },
+          root: {
+            borderRadius: 12,
+            boxShadow: "0 6px 20px rgba(2,6,23,0.08)",
+            fontFamily: "Metropolis, sans-serif",
+            fontWeight: 600,
+          },
+        },
+      },
     },
   });
 

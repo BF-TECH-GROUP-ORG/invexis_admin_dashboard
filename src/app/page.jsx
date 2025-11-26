@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useHybridQuery } from "@/hooks/useHybridQuery";
 import StatCard from "@/components/dashboard/StatCard";
 import SalesAnalyticsChart from "@/components/dashboard/SalesAnalyticsChart";
 import TrendingInsightsTable from "@/components/dashboard/TrendingInsightsTable";
@@ -8,47 +9,74 @@ import TopSellingCompaniesChart from "@/components/dashboard/TopSellingCompanies
 import ActiveInactiveCompaniesChart from "@/components/dashboard/ActiveInactiveCompaniesChart";
 import TierDistributionChart from "@/components/dashboard/TierDistributionChart";
 import RecentCompaniesCard from "@/components/dashboard/RecentCompaniesCard";
+import api from "@/lib/axios";
+import UserService from "@/services/UserService";
 
 import {
-  salesDataDaily,
-  salesDataWeekly,
   salesDataMonthly,
-  salesDataYearly,
+  statsData as initialStatsData,
   topSellingCompanies,
   trendingData,
-  companyStatusData,
-  tierData,
-  statsData,
-  recentCompanies,
 } from "@/data/mockData";
 
 export default function DashboardHome() {
   const [salesPeriod, setSalesPeriod] = useState("monthly");
   const [trendsPeriod, setTrendsPeriod] = useState("yearly");
 
-  const [salesStartDate, setSalesStartDate] = useState(
-    new Date(new Date().getFullYear(), new Date().getMonth(), 1)
-      .toISOString()
-      .split("T")[0]
-  );
-  const [salesEndDate, setSalesEndDate] = useState(
-    new Date().toISOString().split("T")[0]
-  );
-  const [trendsStartDate, setTrendsStartDate] = useState(
-    new Date(new Date().getFullYear() - 1, 0, 1).toISOString().split("T")[0]
-  );
-  const [trendsEndDate, setTrendsEndDate] = useState(
-    new Date().toISOString().split("T")[0]
+  // Hybrid Query for Companies
+  const { data: companies = [] } = useHybridQuery(
+    "dashboard_companies",
+    async () => {
+      const data = await (
+        await import("@/services/CompanyService")
+      ).default.getAll({ limit: 200 });
+      return data?.data || data || [];
+    }
   );
 
-  // Get sales data based on selected period
-  const getSalesData = () => {
-    if (salesPeriod === "daily") return salesDataDaily;
-    if (salesPeriod === "weekly") return salesDataWeekly;
-    if (salesPeriod === "monthly") return salesDataMonthly;
-    return salesDataYearly;
-  };
+  // Hybrid Query for User Count
+  const { data: userCount = 0 } = useHybridQuery(
+    "dashboard_user_count",
+    async () => {
+      const res = await UserService.getAll({ page: 1, limit: 1 });
+      return res?.pagination?.totalItems || res?.data?.length || 0;
+    }
+  );
 
+  const getSalesData = () => salesDataMonthly;
+
+  // Prepare chart data from real companies
+  const totalCompanies = companies.length;
+  const activeCount = companies.filter((c) => c.status === "active").length;
+  const inactiveCount = totalCompanies - activeCount;
+  const companyStatusData = [
+    { name: "Active", value: activeCount },
+    { name: "Inactive", value: inactiveCount },
+  ];
+
+  const tierCounts = companies.reduce((acc, c) => {
+    const tier = (c.tier || "basic").toLowerCase();
+    acc[tier] = (acc[tier] || 0) + 1;
+    return acc;
+  }, {});
+  const tierData = [
+    { name: "Basic", value: tierCounts.basic || 0 },
+    { name: "Mid", value: tierCounts.mid || 0 },
+    { name: "Pro", value: tierCounts.pro || 0 },
+  ];
+
+  // Merge real data into statsData
+  const statsData = initialStatsData.map((stat) => {
+    if (stat.title === "Total Companies") {
+      return { ...stat, value: totalCompanies.toString() };
+    }
+    if (stat.title === "Total Users") {
+      return { ...stat, value: userCount.toLocaleString() };
+    }
+    return stat;
+  });
+
+  // Recent companies passed to RecentCompaniesCard
   return (
     <div className="w-full">
       <h1 className="text-2xl font-semibold mb-6">Dashboard Overview</h1>
@@ -69,10 +97,6 @@ export default function DashboardHome() {
             data={getSalesData()}
             period={salesPeriod}
             onPeriodChange={setSalesPeriod}
-            startDate={salesStartDate}
-            endDate={salesEndDate}
-            onStartDateChange={setSalesStartDate}
-            onEndDateChange={setSalesEndDate}
           />
 
           {/* TRENDING INSIGHTS TABLE */}
@@ -80,10 +104,6 @@ export default function DashboardHome() {
             data={trendingData}
             period={trendsPeriod}
             onPeriodChange={setTrendsPeriod}
-            startDate={trendsStartDate}
-            endDate={trendsEndDate}
-            onStartDateChange={setTrendsStartDate}
-            onEndDateChange={setTrendsEndDate}
           />
 
           {/* TOP 20 SELLING COMPANIES CHART */}
@@ -96,7 +116,7 @@ export default function DashboardHome() {
           <ActiveInactiveCompaniesChart data={companyStatusData} />
 
           {/* RECENT REGISTERED COMPANIES */}
-          <RecentCompaniesCard companies={recentCompanies} />
+          <RecentCompaniesCard companies={companies} />
 
           {/* TIER DISTRIBUTION */}
           <TierDistributionChart data={tierData} />

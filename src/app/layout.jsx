@@ -1,10 +1,10 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "@/styles/globals.css";
-import LayoutWrapper from "@/components/layouts/LayoutWrapper";
 import ThemeRegistry from "@/providers/ThemeRegistry";
 import ClientProviders from "@/providers/ClientProviders";
 import ProtectedRoute from "@/providers/ProtectedRoute";
-import { SidebarProvider } from "@/contexts/SidebarContext";
+import NotificationProvider from "@/providers/NotificationProvider";
+import LoadingProvider from "@/providers/LoadingProvider";
 
 export const metadata = {
   title: {
@@ -14,16 +14,22 @@ export const metadata = {
   description: "Invexis Admin Dashboard",
 };
 
+import QueryProvider from "@/providers/QueryProvider";
+
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body className={`font-metropolis antialiased`}>
         <ClientProviders>
-          <SidebarProvider>
-            <LayoutWrapper>
-              <ThemeRegistry>{children}</ThemeRegistry>
-            </LayoutWrapper>
-          </SidebarProvider>
+          <QueryProvider>
+            <ThemeRegistry>
+              <LoadingProvider>
+                <NotificationProvider>
+                  <ProtectedRoute>{children}</ProtectedRoute>
+                </NotificationProvider>
+              </LoadingProvider>
+            </ThemeRegistry>
+          </QueryProvider>
         </ClientProviders>
       </body>
     </html>

@@ -5,18 +5,22 @@ import { Users, Building2, TrendingUp, Award } from "lucide-react";
 export default function CompaniesAnalyticsCards({ companies }) {
   // Calculate analytics
   const totalCompanies = companies.length;
-  const totalEmployees = companies.reduce((sum, c) => sum + (c.employees || 0), 0);
-  const avgEmployees = totalCompanies > 0 ? Math.round(totalEmployees / totalCompanies) : 0;
+  // remove employees aggregation — employees no longer tracked in UI
+  const activeCompaniesCount = companies.filter(
+    (c) => c.status === "active"
+  ).length;
+  const totalEmployees = 0;
+  const pendingVerificationCount = companies.filter(
+    (c) => c.metadata?.verification?.status === "pending"
+  ).length;
+  const avgEmployees = 0;
 
   // Count by tier
-  const tierCounts = companies.reduce(
-    (acc, c) => {
-      const tier = c.tier?.toLowerCase() || "basic";
-      acc[tier] = (acc[tier] || 0) + 1;
-      return acc;
-    },
-    {}
-  );
+  const tierCounts = companies.reduce((acc, c) => {
+    const tier = c.tier?.toLowerCase() || "basic";
+    acc[tier] = (acc[tier] || 0) + 1;
+    return acc;
+  }, {});
 
   const proCount = tierCounts["pro"] || 0;
   const midCount = tierCounts["mid"] || 0;
@@ -32,20 +36,20 @@ export default function CompaniesAnalyticsCards({ companies }) {
       description: "Active companies in system",
     },
     {
-      title: "Total Employees",
-      value: totalEmployees.toLocaleString(),
+      title: "Active Companies",
+      value: activeCompaniesCount,
       icon: Users,
       color: "#10b981",
       bgColor: "#f0fdf4",
-      description: "Across all companies",
+      description: "Companies with active status",
     },
     {
-      title: "Avg Employees",
-      value: avgEmployees,
+      title: "Pending Verification",
+      value: pendingVerificationCount,
       icon: TrendingUp,
       color: "#3b82f6",
       bgColor: "#eff6ff",
-      description: "Per company",
+      description: "Companies awaiting verification",
     },
     {
       title: "Premium Tier",
@@ -74,9 +78,7 @@ export default function CompaniesAnalyticsCards({ companies }) {
                 <p className="text-2xl font-bold text-[#081422] mb-2">
                   {card.value}
                 </p>
-                <p className="text-xs text-[#9ca3af]">
-                  {card.description}
-                </p>
+                <p className="text-xs text-[#9ca3af]">{card.description}</p>
               </div>
               <div
                 className="p-3 rounded-xl flex-shrink-0"

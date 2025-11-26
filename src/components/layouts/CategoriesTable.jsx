@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { setTablePagination } from "@/features/SettingsSlice";
 import {
   Card,
   Table,
@@ -23,158 +25,173 @@ import {
   InputAdornment,
   Button,
 } from "@mui/material";
+import CategoryService from "@/services/CategoryService";
+import { useLoading } from "@/providers/LoadingProvider";
 import { HiSearch, HiPencil, HiTrash, HiPlus } from "react-icons/hi";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useNotification } from "@/providers/NotificationProvider";
 
-export const mockCategories = [
-  {
-    id: "cat_1",
-    name: "Grocery & Gourmet Food",
-    slug: "grocery-gourmet-food-biryoshye",
-    description: "Fresh and gourmet food items, snacks, and beverages.",
-    level: 1,
-    parent: null,
-    image: {
-      url: "https://thumbs.dreamstime.com/b/grocery-store-banner-food-drinks-label-vector-illustration-91752092.jpg",
-      alt: "Grocery and gourmet food category banner",
-    },
-    seo: {
-      metaTitle: "Grocery & Gourmet Food - Fresh & Delicacies",
-      metaDescription: "Daily essentials and premium gourmet selections.",
-      keywords: ["grocery", "food", "snacks", "beverages", "gourmet"],
-    },
-    attributes: [
-      {
-        name: "Dietary",
-        type: "multiselect",
-        options: ["Vegan", "Gluten-Free", "Organic"],
-      },
-      {
-        name: "Type",
-        type: "select",
-        options: ["Fresh", "Packaged", "Frozen"],
-      },
-    ],
-    statistics: { totalProducts: 0, totalSubcategories: 1 },
-  },
-  {
-    id: "cat_2",
-    name: "Footwear",
-    slug: "footwear",
-    description: "Shoes, boots, and sandals for all seasons.",
-    level: 2,
-    parent: "Grocery & Gourmet Food",
-    image: {
-      url: "https://example.com/footwear.jpg",
-      alt: "Footwear subcategory banner",
-    },
-    seo: {
-      metaTitle: "Footwear - Shoes, Boots & Sandals",
-      metaDescription: "Comfortable footwear for men and women.",
-      keywords: ["shoes", "boots", "sandals", "sneakers"],
-    },
-    attributes: [
-      { name: "Size", type: "select", options: ["6", "7", "8", "9"] },
-    ],
-    statistics: { totalProducts: 0, totalSubcategories: 1 },
-  },
-  {
-    id: "cat_3",
-    name: "Sandals",
-    slug: "sandals",
-    description: "Open-toed footwear for summer.",
-    level: 3,
-    parent: "Footwear",
-    image: {
-      url: "https://example.com/sandals.jpg",
-      alt: "Sandals subcategory banner",
-    },
-    seo: {
-      metaTitle: "Sandals - Summer Open-Toed Shoes",
-      metaDescription: "Flip-flops and strappy sandals.",
-      keywords: ["sandals", "flip-flops", "strappy"],
-    },
-    attributes: [
-      {
-        name: "Style",
-        type: "select",
-        options: ["Flip-Flop", "Strappy", "Wedge"],
-      },
-    ],
-    statistics: { totalProducts: 0, totalSubcategories: 0 },
-  },
-];
+export const mockCategories = [];
 
 export default function CategoriesTable({
   filterLevel,
   filterParent,
   onFilterChange,
 }) {
-  const [categories, setCategories] = useState(mockCategories);
+  const [categories, setCategories] = useState([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [selected, setSelected] = useState([]);
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const dispatch = useDispatch();
+  const tableSettings = useSelector(
+    (s) => s.settings?.tables?.categories || {}
+  );
+  const page = tableSettings.page ?? 0;
+  const rowsPerPage = tableSettings.rowsPerPage ?? 5;
   const [search, setSearch] = useState("");
   const [levelFilter, setLevelFilter] = useState("");
   const [parentFilter, setParentFilter] = useState("");
   const [openMenu, setOpenMenu] = useState(null);
   const router = useRouter();
+  const { showNotification } = useNotification();
+  const { showLoader, hideLoader } = useLoading();
 
+  const [sort, setSort] = useState("name_asc");
+
+  // Sorting and filtering
   const filteredCategories = useMemo(() => {
-    return categories.filter((c) => {
-      const matchesSearch =
-        c.name.toLowerCase().includes(search.toLowerCase()) ||
-        c.slug.toLowerCase().includes(search.toLowerCase()) ||
-        (c.description || "").toLowerCase().includes(search.toLowerCase());
-      const matchesLevel =
-        !levelFilter || String(c.level) === String(levelFilter);
-      const matchesParent = !parentFilter || (c.parent || "") === parentFilter;
-      return matchesSearch && matchesLevel && matchesParent;
+    const result = [...categories];
+    result.sort((a, b) => {
+      switch (sort) {
+        case "name_asc":
+          return (a.name || "").localeCompare(b.name || "");
+        case "name_desc":
+          return (b.name || "").localeCompare(a.name || "");
+        case "products_desc":
+          return (
+            (b.statistics?.totalProducts || 0) -
+            (a.statistics?.totalProducts || 0)
+          );
+        case "products_asc":
+          return (
+            (a.statistics?.totalProducts || 0) -
+            (b.statistics?.totalProducts || 0)
+          );
+        case "subcats_desc":
+          return (
+            (b.statistics?.totalSubcategories || 0) -
+            (a.statistics?.totalSubcategories || 0)
+          );
+        case "subcats_asc":
+          return (
+            (a.statistics?.totalSubcategories || 0) -
+            (b.statistics?.totalSubcategories || 0)
+          );
+        default:
+          return 0;
+      }
     });
-  }, [categories, search, levelFilter, parentFilter]);
+    return result;
+  }, [categories, sort]);
 
-  const handleSelectAll = (e) => {
-    if (e.target.checked) setSelected(filteredCategories.map((c) => c.id));
-    else setSelected([]);
+  // Fetch categories from backend
+  const fetchCategories = async () => {
+    showLoader();
+    try {
+      const response = await CategoryService.getCategories({
+        page: page + 1, // API expects 1-indexed page
+        limit: rowsPerPage,
+        search,
+        level: levelFilter,
+        parent: parentFilter,
+        sort,
+      });
+
+      // Response shape may vary between gateways/backends (res.data vs res.data.data).
+      // Normalize to { categories: [], totalCount: number }
+      const payload = response?.data ?? response ?? {};
+      const categoriesResult =
+        payload.categories ??
+        payload.data ??
+        (Array.isArray(payload) ? payload : []);
+      const total =
+        payload.totalCount ??
+        payload.total ??
+        (Array.isArray(categoriesResult) ? categoriesResult.length : 0);
+
+      setCategories(categoriesResult);
+      setTotalCount(total);
+    } catch (error) {
+      console.error("Failed to fetch categories:", error);
+      showNotification("Failed to fetch categories.", "error");
+    } finally {
+      hideLoader();
+    }
+  };
+
+  useEffect(() => {
+    fetchCategories();
+  }, [page, rowsPerPage, search, levelFilter, parentFilter, sort]);
+
+  // Sync external filter props
+  useEffect(() => {
+    if (filterLevel !== undefined) setLevelFilter(filterLevel);
+    if (filterParent !== undefined) setParentFilter(filterParent);
+  }, [filterLevel, filterParent]);
+
+  // Pagination handlers
+  const handleChangePage = (event, newPage) => {
+    dispatch(setTablePagination({ table: "categories", page: newPage }));
+  };
+
+  const handleChangeRowsPerPage = (event) => {
+    const newRows = parseInt(event.target.value, 10);
+    dispatch(
+      setTablePagination({ table: "categories", rowsPerPage: newRows, page: 0 })
+    );
+  };
+
+  // Row selection handlers
+  const handleSelectAll = (event) => {
+    if (event.target.checked) {
+      const allIds = filteredCategories.map((cat) => cat.id);
+      setSelected(allIds);
+    } else {
+      setSelected([]);
+    }
   };
 
   const handleSelectRow = (id) => {
     setSelected((prev) =>
-      prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]
     );
   };
 
-  const handleChangePage = (_, newPage) => setPage(newPage);
-  const handleChangeRowsPerPage = (e) => {
-    setRowsPerPage(parseInt(e.target.value, 10));
-    setPage(0);
+  // Edit / Delete actions
+  const handleEdit = (slug) => {
+    router.push(`/admin/categories/edit/${slug}`);
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this category?"))
+      return;
+    showLoader();
+    try {
+      await CategoryService.deleteCategory(id);
+      showNotification("Category deleted successfully!", "success");
+      fetchCategories();
+    } catch (error) {
+      console.error("Failed to delete category:", error);
+      showNotification("Failed to delete category.", "error");
+    } finally {
+      hideLoader();
+    }
   };
 
   const getUniqueParents = () => {
-    return [...new Set(categories.map((c) => c.parent).filter(Boolean))].sort();
+    const parents = categories.map((c) => c.parent).filter(Boolean);
+    return [...new Set(parents)];
   };
-
-  // Sync external filters (from analytics cards) with internal select controls
-  useEffect(() => {
-    if (filterLevel !== undefined) setLevelFilter(filterLevel || "");
-  }, [filterLevel]);
-
-  useEffect(() => {
-    if (filterParent !== undefined) setParentFilter(filterParent || "");
-  }, [filterParent]);
-
-  const handleEdit = (slug) => {
-    router.push(`/categories/edit/${slug}`);
-    setOpenMenu(null);
-  };
-
-  const handleDelete = (id) => {
-    if (confirm("Delete this category?"))
-      setCategories((prev) => prev.filter((c) => c.id !== id));
-    setOpenMenu(null);
-  };
-
-  const handleAdd = () => router.push("/categories/new");
 
   return (
     <>
@@ -188,30 +205,20 @@ export default function CategoriesTable({
         {/* Header */}
         <Box
           display="flex"
-          alignItems="center"
           justifyContent="space-between"
+          alignItems="center"
           px={2.5}
           py={1.5}
+          sx={{ borderBottom: "1px solid #e5e7eb" }}
         >
-          <Box>
-            <Typography variant="h6" fontWeight={700} sx={{ color: "#081422" }}>
-              Categories
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              Manage product categories and their attributes
-            </Typography>
-          </Box>
-
-          <Box>
-            <Button
-              startIcon={<HiPlus />}
-              variant="contained"
-              onClick={handleAdd}
-              sx={{ backgroundColor: "#081422" }}
-            >
+          <Typography variant="h6" fontWeight={600}>
+            Categories
+          </Typography>
+          <Link href="/admin/categories/new" passHref>
+            <Button variant="contained" startIcon={<HiPlus />}>
               Add Category
             </Button>
-          </Box>
+          </Link>
         </Box>
 
         {/* Controls */}
@@ -240,6 +247,21 @@ export default function CategoriesTable({
               ),
             }}
           />
+
+          <Select
+            size="small"
+            value={sort}
+            onChange={(e) => setSort(e.target.value)}
+            displayEmpty
+            sx={{ minWidth: 160 }}
+          >
+            <MenuItem value="name_asc">Name (A-Z)</MenuItem>
+            <MenuItem value="name_desc">Name (Z-A)</MenuItem>
+            <MenuItem value="products_desc">Products (High-Low)</MenuItem>
+            <MenuItem value="products_asc">Products (Low-High)</MenuItem>
+            <MenuItem value="subcats_desc">Subcats (High-Low)</MenuItem>
+            <MenuItem value="subcats_asc">Subcats (Low-High)</MenuItem>
+          </Select>
 
           <Select
             size="small"
@@ -309,80 +331,69 @@ export default function CategoriesTable({
                   <TableCell align="center">Actions</TableCell>
                 </TableRow>
               </TableHead>
-
               <TableBody>
-                {filteredCategories
-                  .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                  .map((cat) => (
-                    <TableRow
-                      key={cat.id}
-                      hover
-                      selected={selected.includes(cat.id)}
-                    >
-                      <TableCell padding="checkbox">
-                        <Checkbox
-                          checked={selected.includes(cat.id)}
-                          onChange={() => handleSelectRow(cat.id)}
+                {filteredCategories.map((cat) => (
+                  <TableRow
+                    key={cat.id}
+                    hover
+                    selected={selected.includes(cat.id)}
+                  >
+                    <TableCell padding="checkbox">
+                      <Checkbox
+                        checked={selected.includes(cat.id)}
+                        onChange={() => handleSelectRow(cat.id)}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Box display="flex" alignItems="center" gap={1.5}>
+                        <Avatar
+                          alt={cat.name}
+                          src={cat.image?.url}
+                          sx={{ width: 36, height: 36 }}
                         />
-                      </TableCell>
-
-                      <TableCell>
-                        <Box display="flex" alignItems="center" gap={1.5}>
-                          <Avatar
-                            alt={cat.name}
-                            src={cat.image?.url}
-                            sx={{ width: 36, height: 36 }}
-                          />
-                          <Box>
-                            <Typography variant="subtitle2" fontWeight={600}>
-                              {cat.name}
-                            </Typography>
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                            >
-                              {cat.description}
-                            </Typography>
-                          </Box>
+                        <Box>
+                          <Typography variant="subtitle2" fontWeight={600}>
+                            {cat.name}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {cat.description}
+                          </Typography>
                         </Box>
-                      </TableCell>
-
-                      <TableCell>{cat.slug}</TableCell>
-                      <TableCell>{cat.level}</TableCell>
-                      <TableCell>{cat.parent || "-"}</TableCell>
-                      <TableCell>
-                        {cat.statistics?.totalProducts ?? 0}
-                      </TableCell>
-                      <TableCell>
-                        {cat.statistics?.totalSubcategories ?? 0}
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          label={`${cat.attributes?.length ?? 0}`}
+                      </Box>
+                    </TableCell>
+                    <TableCell>{cat.slug}</TableCell>
+                    <TableCell>{cat.level}</TableCell>
+                    <TableCell>{cat.parent || "-"}</TableCell>
+                    <TableCell>{cat.statistics?.totalProducts ?? 0}</TableCell>
+                    <TableCell>
+                      {cat.statistics?.totalSubcategories ?? 0}
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={`${cat.attributes?.length ?? 0}`}
+                        size="small"
+                      />
+                    </TableCell>
+                    <TableCell align="center" sx={{ position: "relative" }}>
+                      <Tooltip title="Edit">
+                        <IconButton
                           size="small"
-                        />
-                      </TableCell>
-
-                      <TableCell align="center" sx={{ position: "relative" }}>
-                        <Tooltip title="Edit">
-                          <IconButton
-                            size="small"
-                            onClick={() => handleEdit(cat.slug)}
-                          >
-                            <HiPencil />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Delete">
-                          <IconButton
-                            size="small"
-                            onClick={() => handleDelete(cat.id)}
-                          >
-                            <HiTrash style={{ color: "#dc2626" }} />
-                          </IconButton>
-                        </Tooltip>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                          onClick={() => handleEdit(cat.slug)}
+                        >
+                          <HiPencil />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Delete">
+                        <IconButton
+                          size="small"
+                          onClick={() => handleDelete(cat.id)}
+                        >
+                          <HiTrash style={{ color: "#dc2626" }} />
+                        </IconButton>
+                      </Tooltip>
+                    </TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           </TableContainer>
@@ -398,12 +409,11 @@ export default function CategoriesTable({
           sx={{ borderTop: "1px solid #e5e7eb", backgroundColor: "#f3f3f3ff" }}
         >
           <Typography variant="body2" color="text.secondary">
-            {filteredCategories.length} categories
+            {totalCount} categories
           </Typography>
-
           <TablePagination
             component="div"
-            count={filteredCategories.length}
+            count={totalCount}
             page={page}
             onPageChange={handleChangePage}
             rowsPerPage={rowsPerPage}

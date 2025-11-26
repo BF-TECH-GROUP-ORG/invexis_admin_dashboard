@@ -1,48 +1,60 @@
-'use client';
+"use client";
 
-import { useState, useRef } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { Upload, Calendar, Clock } from 'lucide-react';
+import { useState, useRef } from "react";
+import { useNotification } from "@/providers/NotificationProvider";
+import { useDispatch, useSelector } from "react-redux";
+import { Upload, Calendar, Clock } from "lucide-react";
 import {
   createProduct,
   updateProduct,
   uploadProductImage,
-  selectProductLoading
-} from '@/store/slices/productSlice';
+  selectProductLoading,
+} from "@/store/slices/productSlice";
 
 const ProductForm = ({ onClose, productToEdit = null }) => {
   const dispatch = useDispatch();
   const loading = useSelector(selectProductLoading);
   const fileInputRef = useRef(null);
+  const { showNotification } = useNotification();
 
-  const [formData, setFormData] = useState(productToEdit || {
-    name: '',
-    category: '',
-    unitPrice: '',
-    supplier: '',
-    expiryDate: '',
-    quantity: '',
-    description: '',
-    image: null,
-    discountEnabled: false,
-    discountType: 'percentage',
-    discountValue: '',
-    returnPolicy: {
-      dateAdded: new Date().toISOString().split('T')[0],
-      time: '12:00 PM'
+  const [formData, setFormData] = useState(
+    productToEdit || {
+      name: "",
+      category: "",
+      unitPrice: "",
+      supplier: "",
+      expiryDate: "",
+      quantity: "",
+      description: "",
+      image: null,
+      discountEnabled: false,
+      discountType: "percentage",
+      discountValue: "",
+      returnPolicy: {
+        dateAdded: new Date().toISOString().split("T")[0],
+        time: "12:00 PM",
+      },
     }
-  });
+  );
 
-  const [imagePreview, setImagePreview] = useState(productToEdit?.image || null);
+  const [imagePreview, setImagePreview] = useState(
+    productToEdit?.image || null
+  );
 
-  const categories = ['Phone', 'Laptop', 'Tablet', 'Accessories', 'Electronics'];
-  const suppliers = ['Apple Inc', 'Samsung', 'Dell', 'HP', 'Sony'];
+  const categories = [
+    "Phone",
+    "Laptop",
+    "Tablet",
+    "Accessories",
+    "Electronics",
+  ];
+  const suppliers = ["Apple Inc", "Samsung", "Dell", "HP", "Sony"];
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: type === "checkbox" ? checked : value,
     }));
   };
 
@@ -52,7 +64,7 @@ const ProductForm = ({ onClose, productToEdit = null }) => {
       const reader = new FileReader();
       reader.onloadend = () => {
         setImagePreview(reader.result);
-        setFormData(prev => ({ ...prev, image: file }));
+        setFormData((prev) => ({ ...prev, image: file }));
       };
       reader.readAsDataURL(file);
     }
@@ -62,25 +74,33 @@ const ProductForm = ({ onClose, productToEdit = null }) => {
     e.preventDefault();
     try {
       if (productToEdit) {
-        await dispatch(updateProduct({
-          id: productToEdit.id,
-          productData: formData
-        })).unwrap();
+        await dispatch(
+          updateProduct({
+            id: productToEdit.id,
+            productData: formData,
+          })
+        ).unwrap();
       } else {
         await dispatch(createProduct(formData)).unwrap();
       }
 
-      alert('Product saved successfully!');
+      showNotification({
+        message: "Product saved successfully!",
+        severity: "success",
+      });
       onClose();
     } catch (error) {
-      alert('Error saving product: ' + error.message || error);
+      showNotification({
+        message: "Error saving product: " + (error.message || error),
+        severity: "error",
+      });
     }
   };
 
   return (
     <div className="bg-white rounded-lg p-6 max-w-4xl mx-auto">
       <h2 className="text-2xl font-bold text-gray-900 mb-6">
-        {productToEdit ? 'Edit Product' : 'Add New Product'}
+        {productToEdit ? "Edit Product" : "Add New Product"}
       </h2>
 
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -88,7 +108,9 @@ const ProductForm = ({ onClose, productToEdit = null }) => {
           {/* Left Column */}
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Product name</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Product name
+              </label>
               <input
                 type="text"
                 name="name"
@@ -101,7 +123,9 @@ const ProductForm = ({ onClose, productToEdit = null }) => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Category
+              </label>
               <select
                 name="category"
                 value={formData.category}
@@ -110,15 +134,19 @@ const ProductForm = ({ onClose, productToEdit = null }) => {
                 required
               >
                 <option value="">Select product category</option>
-                {categories.map(cat => (
-                  <option key={cat} value={cat.toLowerCase()}>{cat}</option>
+                {categories.map((cat) => (
+                  <option key={cat} value={cat.toLowerCase()}>
+                    {cat}
+                  </option>
                 ))}
               </select>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Selling price</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Selling price
+                </label>
                 <input
                   type="number"
                   name="unitPrice"
@@ -131,7 +159,9 @@ const ProductForm = ({ onClose, productToEdit = null }) => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Supplier</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Supplier
+                </label>
                 <select
                   name="supplier"
                   value={formData.supplier}
@@ -140,15 +170,19 @@ const ProductForm = ({ onClose, productToEdit = null }) => {
                   required
                 >
                   <option value="">Select supplier</option>
-                  {suppliers.map(sup => (
-                    <option key={sup} value={sup}>{sup}</option>
+                  {suppliers.map((sup) => (
+                    <option key={sup} value={sup}>
+                      {sup}
+                    </option>
                   ))}
                 </select>
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Expiry Date</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Expiry Date
+              </label>
               <input
                 type="date"
                 name="expiryDate"
@@ -160,7 +194,9 @@ const ProductForm = ({ onClose, productToEdit = null }) => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Product quantity</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Product quantity
+              </label>
               <input
                 type="number"
                 name="quantity"
@@ -175,7 +211,9 @@ const ProductForm = ({ onClose, productToEdit = null }) => {
             {/* Discount Section */}
             <div className="border-t pt-4">
               <div className="flex items-center justify-between mb-4">
-                <label className="text-sm font-medium text-gray-700">Discount</label>
+                <label className="text-sm font-medium text-gray-700">
+                  Discount
+                </label>
                 <label className="flex items-center cursor-pointer relative">
                   <input
                     type="checkbox"
@@ -186,15 +224,17 @@ const ProductForm = ({ onClose, productToEdit = null }) => {
                   />
                   <div
                     className={`w-10 h-6 rounded-full transition-colors ${
-                      formData.discountEnabled ? 'bg-orange-500' : 'bg-gray-300'
+                      formData.discountEnabled ? "bg-orange-500" : "bg-gray-300"
                     }`}
                   ></div>
                   <div
                     className={`absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform ${
-                      formData.discountEnabled ? 'translate-x-4' : ''
+                      formData.discountEnabled ? "translate-x-4" : ""
                     }`}
                   ></div>
-                  <span className="ml-2 text-sm text-gray-600">Add Discount</span>
+                  <span className="ml-2 text-sm text-gray-600">
+                    Add Discount
+                  </span>
                 </label>
               </div>
 
@@ -225,7 +265,9 @@ const ProductForm = ({ onClose, productToEdit = null }) => {
           <div className="space-y-4">
             {/* Description */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Description
+              </label>
               <textarea
                 name="description"
                 value={formData.description}
@@ -238,17 +280,25 @@ const ProductForm = ({ onClose, productToEdit = null }) => {
 
             {/* Image Upload */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Product Image</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Product Image
+              </label>
               <div
                 className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-4 cursor-pointer hover:border-orange-400 transition"
                 onClick={() => fileInputRef.current.click()}
               >
                 {imagePreview ? (
-                  <img src={imagePreview} alt="Preview" className="w-48 h-48 object-cover rounded-lg" />
+                  <img
+                    src={imagePreview}
+                    alt="Preview"
+                    className="w-48 h-48 object-cover rounded-lg"
+                  />
                 ) : (
                   <>
                     <Upload className="w-10 h-10 text-gray-400" />
-                    <p className="text-sm text-gray-500 mt-2">Click to upload product image</p>
+                    <p className="text-sm text-gray-500 mt-2">
+                      Click to upload product image
+                    </p>
                   </>
                 )}
                 <input
@@ -264,7 +314,8 @@ const ProductForm = ({ onClose, productToEdit = null }) => {
             {/* Return Policy Info */}
             <div className="flex items-center justify-between mt-6 text-gray-600 text-sm">
               <span className="flex items-center gap-2">
-                <Calendar className="w-4 h-4" /> Added: {formData.returnPolicy.dateAdded}
+                <Calendar className="w-4 h-4" /> Added:{" "}
+                {formData.returnPolicy.dateAdded}
               </span>
               <span className="flex items-center gap-2">
                 <Clock className="w-4 h-4" /> {formData.returnPolicy.time}
@@ -287,7 +338,7 @@ const ProductForm = ({ onClose, productToEdit = null }) => {
             disabled={loading}
             className="px-6 py-2 rounded-lg bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-50 transition"
           >
-            {loading ? 'Saving...' : 'Save Product'}
+            {loading ? "Saving..." : "Save Product"}
           </button>
         </div>
       </form>

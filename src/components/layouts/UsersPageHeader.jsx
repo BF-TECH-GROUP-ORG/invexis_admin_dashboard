@@ -8,7 +8,7 @@ export default function UsersPageHeader({
   onAddUser,
   onAdd,
   title = "Company List",
-  link = "clients/new",
+  link = "/clients/new",
   addLabel = "Add Company",
   breadcrumb = [
     { label: "Dashboard", href: "/" },

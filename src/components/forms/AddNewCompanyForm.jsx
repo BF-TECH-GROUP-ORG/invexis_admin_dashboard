@@ -1,10 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronRight, ChevronLeft, Check } from "lucide-react";
+import { ChevronRight, ChevronLeft, Check, Search, X } from "lucide-react";
+import { useNotification } from "../../providers/NotificationProvider";
+import CompanyService from "../../services/CompanyService";
+import CategoryService from "../../services/CategoryService";
+import { COUNTRIES } from "../../constants/countries";
 
-const AddNewCompanyForm = () => {
+const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState({
@@ -14,33 +18,116 @@ const AddNewCompanyForm = () => {
     phone: "",
     country: "",
     city: "",
-    address: "",
-    tier: "basic",
-    industry: "",
-    employees: "",
-    registrationNumber: "",
+    tier: "",
+    category_ids: [],
   });
 
   const [errors, setErrors] = useState({});
+  const { showNotification } = useNotification();
+
+  // Categories state
+  const [categoriesList, setCategoriesList] = useState([]);
+  const [categoryStats, setCategoryStats] = useState({ level1: 0, level3: 0 });
+
+  // Country search state
+  const [countrySearch, setCountrySearch] = useState("");
+  const [isCountryDropdownOpen, setIsCountryDropdownOpen] = useState(false);
+
+  // Filtered countries
+  const filteredCountries = useMemo(() => {
+    if (!countrySearch) return COUNTRIES;
+    return COUNTRIES.filter((c) =>
+      c.name.toLowerCase().includes(countrySearch.toLowerCase())
+    );
+  }, [countrySearch]);
+
+  const selectedCountry = COUNTRIES.find((c) => c.name === formData.country);
+
+  // If editing, populate form with initial data
+  useEffect(() => {
+    if (initialData) {
+      setFormData((prev) => ({
+        ...prev,
+        name: initialData.name || "",
+        domain: initialData.domain || "",
+        email: initialData.email || "",
+        phone: initialData.phone || "",
+        country: initialData.country || "",
+        city: initialData.city || "",
+        tier: initialData.tier ?? "",
+        category_ids: initialData.category_ids || [],
+      }));
+    }
+  }, [initialData]);
+
+  // Fetch categories (Level 2 only for selection)
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        // Fetch all categories to process relationships
+        const data = await CategoryService.getAll({ page: 1, limit: 1000 });
+        const allCategories = data?.data || data || [];
+
+        if (mounted) {
+          // Filter for Level 2 categories for the selection list
+          const level2 = allCategories.filter((c) => c.level === 2);
+          setCategoriesList(level2);
+
+          // Store all categories to calculate stats later
+          window.allCategoriesCache = allCategories;
+        }
+      } catch (e) {
+        console.error("Failed to fetch categories", e);
+      }
+    })();
+    return () => (mounted = false);
+  }, []);
+
+  // Calculate stats when category selection changes
+  useEffect(() => {
+    if (!window.allCategoriesCache) return;
+
+    const allCats = window.allCategoriesCache;
+    const selectedIds = formData.category_ids;
+
+    // Find selected Level 2 categories
+    const selectedL2 = allCats.filter((c) =>
+      selectedIds.includes(c.id || c._id)
+    );
+
+    // Find related Level 1 (parents of selected L2)
+    const relatedL1Ids = new Set(
+      selectedL2
+        .map(
+          (c) =>
+            c.parentCategory?.id || c.parentCategory?._id || c.parentCategory
+        )
+        .filter(Boolean)
+    );
+
+    // Find related Level 3 (children of selected L2)
+    const relatedL3 = allCats.filter((c) => {
+      const parentId =
+        c.parentCategory?.id || c.parentCategory?._id || c.parentCategory;
+      return c.level === 3 && selectedIds.includes(parentId);
+    });
+
+    setCategoryStats({
+      level1: relatedL1Ids.size,
+      level3: relatedL3.length,
+    });
+  }, [formData.category_ids]);
 
   const steps = [
     { id: 1, title: "Basic Info", fields: ["name", "domain", "email"] },
-    {
-      id: 2,
-      title: "Contact Details",
-      fields: ["phone", "country", "city", "address"],
-    },
-    {
-      id: 3,
-      title: "Company Details",
-      fields: ["industry", "employees", "registrationNumber"],
-    },
+    { id: 2, title: "Contact Details", fields: ["phone", "country", "city"] },
+    { id: 3, title: "Categories", fields: ["category_ids"] },
     { id: 4, title: "Plan Selection", fields: ["tier"] },
   ];
 
   const handleInputChange = (field, value) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
-    // Clear error for this field when user starts typing
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: "" }));
     }
@@ -49,14 +136,17 @@ const AddNewCompanyForm = () => {
   const validateStep = (stepId) => {
     const stepFields = steps[stepId - 1].fields;
     const newErrors = {};
+    const requiredFields = { name: true };
 
     stepFields.forEach((field) => {
-      if (!formData[field] || formData[field].toString().trim() === "") {
+      if (
+        requiredFields[field] &&
+        (!formData[field] || formData[field].toString().trim() === "")
+      ) {
         newErrors[field] = "This field is required";
       }
     });
 
-    // Email validation
     if (formData.email && stepId === 1) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(formData.email)) {
@@ -64,7 +154,6 @@ const AddNewCompanyForm = () => {
       }
     }
 
-    // Phone validation
     if (formData.phone && stepId === 2) {
       const phoneRegex = /^\+?[1-9]\d{1,14}$/;
       if (!phoneRegex.test(formData.phone.replace(/\s/g, ""))) {
@@ -90,13 +179,59 @@ const AddNewCompanyForm = () => {
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleFormKeyDown = (e) => {
+    if (e.key === "Enter" && e.target && e.target.tagName !== "TEXTAREA") {
+      e.preventDefault();
+    }
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (validateStep(currentStep)) {
-      console.log("Form submitted:", formData);
-      alert("Company added successfully!");
-      // Redirect to clients list after successful submission
-      router.push("/clients/list");
+    if (!validateStep(currentStep)) return;
+
+    const payload = {
+      name: formData.name,
+      domain: formData.domain || null,
+      email: formData.email || null,
+      phone: formData.phone || null,
+      country: formData.country || null,
+      city: formData.city || null,
+      tier: formData.tier || null,
+      category_ids: formData.category_ids || [],
+    };
+
+    try {
+      let res;
+      if (initialData && initialData.id) {
+        res = await CompanyService.update(initialData.id, payload);
+      } else {
+        res = await CompanyService.create(payload);
+      }
+
+      if (res?.success || res?.id || res?.data?.success) {
+        try {
+          localStorage.removeItem("companies_cache_v1");
+        } catch (e) {}
+
+        showNotification({
+          message: initialData ? "Company updated" : "Company added",
+          severity: "success",
+        });
+
+        if (onSuccess) onSuccess(res.data || res);
+        router.push("/clients/list");
+      } else {
+        showNotification({
+          message: "Failed to save company",
+          severity: "error",
+        });
+      }
+    } catch (err) {
+      console.error("Save company failed", err);
+      showNotification({
+        message: err?.response?.data?.message || "Failed to save company",
+        severity: "error",
+      });
     }
   };
 
@@ -107,7 +242,11 @@ const AddNewCompanyForm = () => {
       <div className="max-w-6xl mx-auto">
         <div className="flex gap-20">
           {/* Left: Form Container */}
-          <form onSubmit={handleSubmit} className="flex-1">
+          <form
+            onSubmit={handleSubmit}
+            onKeyDown={handleFormKeyDown}
+            className="flex-1"
+          >
             <div className="border-2 border-[#d1d5db] rounded-3xl p-8 md:p-12 bg-white">
               {/* Step Title */}
               <div className="mb-8">
@@ -225,23 +364,74 @@ const AddNewCompanyForm = () => {
                       )}
                     </div>
 
-                    <div>
+                    <div className="relative">
                       <label className="block text-sm font-semibold text-[#081422] mb-2">
                         Country
                       </label>
-                      <input
-                        type="text"
-                        value={formData.country}
-                        onChange={(e) =>
-                          handleInputChange("country", e.target.value)
-                        }
-                        placeholder="e.g., Rwanda"
-                        className={`w-full px-4 py-3 rounded-2xl border-2 outline-none transition-all focus:border-[#ff782d] ${
+                      <div
+                        className={`w-full px-4 py-3 rounded-2xl border-2 outline-none transition-all cursor-pointer flex items-center justify-between ${
                           errors.country
                             ? "border-red-500"
                             : "border-[#d1d5db] hover:border-[#ff782d]"
-                        } bg-white text-[#081422] placeholder-[#6b7280]`}
-                      />
+                        } bg-white text-[#081422]`}
+                        onClick={() =>
+                          setIsCountryDropdownOpen(!isCountryDropdownOpen)
+                        }
+                      >
+                        <span
+                          className={!formData.country ? "text-[#6b7280]" : ""}
+                        >
+                          {selectedCountry
+                            ? `${selectedCountry.flag} ${selectedCountry.name}`
+                            : formData.country || "Select a country"}
+                        </span>
+                        <ChevronRight
+                          className={`transform transition-transform ${
+                            isCountryDropdownOpen ? "rotate-90" : ""
+                          }`}
+                          size={20}
+                        />
+                      </div>
+                      {/* Dropdown contents */}
+                      {isCountryDropdownOpen && (
+                        <div className="absolute left-0 mt-2 w-full bg-white border-2 border-[#d1d5db] rounded-2xl shadow-lg z-50">
+                          <div className="p-3">
+                            <input
+                              type="text"
+                              value={countrySearch}
+                              onChange={(e) => setCountrySearch(e.target.value)}
+                              placeholder="Search country..."
+                              autoFocus
+                              className="w-full px-3 py-2 rounded-xl border-2 outline-none focus:border-[#ff782d] bg-white text-[#081422] placeholder-[#6b7280]"
+                            />
+                          </div>
+                          <div className="overflow-y-auto max-h-56 p-2">
+                            {filteredCountries.map((c) => (
+                              <div
+                                key={c.code}
+                                onClick={() => {
+                                  handleInputChange("country", c.name);
+                                  setIsCountryDropdownOpen(false);
+                                  setCountrySearch("");
+                                }}
+                                className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors ${
+                                  formData.country === c.name
+                                    ? "bg-[#fff8f5] text-[#ff782d]"
+                                    : "hover:bg-[#f3f4f6] text-[#081422]"
+                                }`}
+                              >
+                                <span className="text-2xl">{c.flag}</span>
+                                <span className="font-medium">{c.name}</span>
+                              </div>
+                            ))}
+                            {filteredCountries.length === 0 && (
+                              <div className="p-4 text-center text-[#6b7280]">
+                                No countries found
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
                       {errors.country && (
                         <p className="text-red-500 text-sm mt-1">
                           {errors.country}
@@ -272,107 +462,108 @@ const AddNewCompanyForm = () => {
                         </p>
                       )}
                     </div>
-
-                    <div>
-                      <label className="block text-sm font-semibold text-[#081422] mb-2">
-                        Address
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.address}
-                        onChange={(e) =>
-                          handleInputChange("address", e.target.value)
-                        }
-                        placeholder="e.g., 123 Innovation Street, Kigali"
-                        className={`w-full px-4 py-3 rounded-2xl border-2 outline-none transition-all focus:border-[#ff782d] ${
-                          errors.address
-                            ? "border-red-500"
-                            : "border-[#d1d5db] hover:border-[#ff782d]"
-                        } bg-white text-[#081422] placeholder-[#6b7280]`}
-                      />
-                      {errors.address && (
-                        <p className="text-red-500 text-sm mt-1">
-                          {errors.address}
-                        </p>
-                      )}
-                    </div>
                   </>
                 )}
 
-                {/* Step 3: Company Details */}
+                {/* Step 3: Categories */}
                 {currentStep === 3 && (
                   <>
                     <div>
                       <label className="block text-sm font-semibold text-[#081422] mb-2">
-                        Industry
+                        Select Categories (Level 2)
                       </label>
-                      <input
-                        type="text"
-                        value={formData.industry}
-                        onChange={(e) =>
-                          handleInputChange("industry", e.target.value)
-                        }
-                        placeholder="e.g., Technology & Electronics"
-                        className={`w-full px-4 py-3 rounded-2xl border-2 outline-none transition-all focus:border-[#ff782d] ${
-                          errors.industry
-                            ? "border-red-500"
-                            : "border-[#d1d5db] hover:border-[#ff782d]"
-                        } bg-white text-[#081422] placeholder-[#6b7280]`}
-                      />
-                      {errors.industry && (
-                        <p className="text-red-500 text-sm mt-1">
-                          {errors.industry}
-                        </p>
-                      )}
-                    </div>
+                      <p className="text-xs text-[#6b7280] mb-3">
+                        Selecting a Level 2 category will automatically link
+                        related Level 1 and Level 3 categories.
+                      </p>
 
-                    <div>
-                      <label className="block text-sm font-semibold text-[#081422] mb-2">
-                        Number of Employees
-                      </label>
-                      <input
-                        type="number"
-                        value={formData.employees}
-                        onChange={(e) =>
-                          handleInputChange("employees", e.target.value)
-                        }
-                        placeholder="e.g., 150"
-                        className={`w-full px-4 py-3 rounded-2xl border-2 outline-none transition-all focus:border-[#ff782d] ${
-                          errors.employees
-                            ? "border-red-500"
-                            : "border-[#d1d5db] hover:border-[#ff782d]"
-                        } bg-white text-[#081422] placeholder-[#6b7280]`}
-                      />
-                      {errors.employees && (
-                        <p className="text-red-500 text-sm mt-1">
-                          {errors.employees}
-                        </p>
-                      )}
-                    </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-96 overflow-y-auto p-1">
+                        {categoriesList.length === 0 && (
+                          <div className="col-span-2 text-center p-4 text-[#6b7280] border-2 border-dashed border-[#d1d5db] rounded-xl">
+                            No Level 2 categories available
+                          </div>
+                        )}
+                        {categoriesList.map((cat) => {
+                          const isSelected = formData.category_ids.includes(
+                            cat.id || cat._id
+                          );
+                          return (
+                            <div
+                              key={cat.id || cat._id}
+                              onClick={() => {
+                                const id = cat.id || cat._id;
+                                const currentIds = [...formData.category_ids];
+                                if (isSelected) {
+                                  handleInputChange(
+                                    "category_ids",
+                                    currentIds.filter((i) => i !== id)
+                                  );
+                                } else {
+                                  handleInputChange("category_ids", [
+                                    ...currentIds,
+                                    id,
+                                  ]);
+                                }
+                              }}
+                              className={`p-4 rounded-xl border-2 cursor-pointer transition-all flex items-center justify-between ${
+                                isSelected
+                                  ? "border-[#ff782d] bg-[#fff8f5]"
+                                  : "border-[#d1d5db] hover:border-[#ff782d]"
+                              }`}
+                            >
+                              <span
+                                className={`font-medium ${
+                                  isSelected
+                                    ? "text-[#ff782d]"
+                                    : "text-[#081422]"
+                                }`}
+                              >
+                                {cat.name}
+                              </span>
+                              {isSelected && (
+                                <Check size={18} className="text-[#ff782d]" />
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
 
-                    <div>
-                      <label className="block text-sm font-semibold text-[#081422] mb-2">
-                        Registration Number
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.registrationNumber}
-                        onChange={(e) =>
-                          handleInputChange(
-                            "registrationNumber",
-                            e.target.value
-                          )
-                        }
-                        placeholder="e.g., REG-2025-001"
-                        className={`w-full px-4 py-3 rounded-2xl border-2 outline-none transition-all focus:border-[#ff782d] ${
-                          errors.registrationNumber
-                            ? "border-red-500"
-                            : "border-[#d1d5db] hover:border-[#ff782d]"
-                        } bg-white text-[#081422] placeholder-[#6b7280]`}
-                      />
-                      {errors.registrationNumber && (
+                      {/* Stats Summary */}
+                      <div className="mt-6 bg-[#f9fafb] rounded-2xl p-4 border border-[#e5e7eb]">
+                        <h4 className="font-semibold text-[#081422] mb-3">
+                          Selection Summary
+                        </h4>
+                        <div className="flex gap-6">
+                          <div>
+                            <p className="text-xs text-[#6b7280] uppercase tracking-wider">
+                              Level 1 (Parents)
+                            </p>
+                            <p className="text-2xl font-bold text-[#ff782d]">
+                              {categoryStats.level1}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-[#6b7280] uppercase tracking-wider">
+                              Level 2 (Selected)
+                            </p>
+                            <p className="text-2xl font-bold text-[#081422]">
+                              {formData.category_ids.length}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-[#6b7280] uppercase tracking-wider">
+                              Level 3 (Children)
+                            </p>
+                            <p className="text-2xl font-bold text-[#ff782d]">
+                              {categoryStats.level3}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {errors.category_ids && (
                         <p className="text-red-500 text-sm mt-1">
-                          {errors.registrationNumber}
+                          {errors.category_ids}
                         </p>
                       )}
                     </div>

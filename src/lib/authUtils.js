@@ -1,4 +1,5 @@
 export const TOKEN_KEY = "invexis_token";
+export const REFRESH_TOKEN_KEY = "invexis_refresh_token";
 export const USER_KEY = "invexis_user";
 
 export function setToken(token) {
@@ -11,9 +12,20 @@ export function getToken() {
   return localStorage.getItem(TOKEN_KEY);
 }
 
+export function setRefreshToken(token) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(REFRESH_TOKEN_KEY, token);
+}
+
+export function getRefreshToken() {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(REFRESH_TOKEN_KEY);
+}
+
 export function removeToken() {
   if (typeof window === "undefined") return;
   localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
 }
 

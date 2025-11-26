@@ -1,6 +1,10 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useHybridQuery } from "@/hooks/useHybridQuery";
+import { useDispatch, useSelector } from "react-redux";
+import { setTablePagination } from "@/features/SettingsSlice";
 import {
   Card,
   Table,
@@ -22,87 +26,73 @@ import {
   Select,
   MenuItem,
   InputAdornment,
-  Button,
 } from "@mui/material";
 import { HiDotsVertical, HiSearch, HiTrash, HiPencil } from "react-icons/hi";
 import IOSSwitch from "../shared/IosSwitch";
 import UsersPageHeader from "./UsersPageHeader";
 import UsersAnalyticsCards from "./UsersAnalyticsCards";
-import { Edit2, Trash2, MoreHorizontal, User as UserIcon } from "lucide-react";
-
-const mockUsers = [
-  {
-    id: "u1",
-    firstName: "Company",
-    lastName: "Admin",
-    email: "company.admin@company.com",
-    phone: "+250789123459",
-    role: "company_admin",
-    position: "Admin",
-    nationalId: "COMP12345",
-    companies: ["company-uuid-123"],
-    shops: [],
-    active: true,
-  },
-  {
-    id: "u2",
-    firstName: "Store",
-    lastName: "Worker",
-    email: "store.worker@company.com",
-    phone: "+250789123463",
-    role: "worker",
-    position: "Sales Representative",
-    nationalId: "WORK12345",
-    companies: ["company-uuid-123"],
-    shops: ["shop-uuid-456"],
-    active: true,
-  },
-  {
-    id: "u3",
-    firstName: "Shop",
-    lastName: "Manager",
-    email: "shop.manager@company.com",
-    phone: "+250789123461",
-    role: "shop_manager",
-    position: "Manager",
-    nationalId: "SHOP12345",
-    companies: ["company-uuid-123"],
-    shops: ["shop-uuid-456"],
-    active: false,
-  },
-  {
-    id: "u4",
-    firstName: "Frank",
-    lastName: "bahirwa",
-    email: "super.adminns@invexis.com",
-    phone: "+250789133157",
-    role: "super_admin",
-    position: "Admin",
-    nationalId: "ABC1452345",
-    companies: [],
-    shops: [],
-    active: true,
-  },
-];
+import { useNotification } from "@/providers/NotificationProvider";
+import { useLoading } from "@/providers/LoadingProvider";
+import UserService from "@/services/UserService";
+import { useRouter } from "next/navigation";
 
 export default function UsersListTable() {
-  const [users, setUsers] = useState(mockUsers);
+  const queryClient = useQueryClient();
+  
+  const { data: users = [], isLoading, error } = useHybridQuery("users_list", async () => {
+    try {
+      const res = await UserService.getAll();
+      console.log("Users API Response:", res);
+      return res.users || res.data || (Array.isArray(res) ? res : []);
+    } catch (err) {
+      console.error("Failed to fetch users:", err);
+      throw err;
+    }
+  });
+
+  // Sync global loader with query loading state
+  useEffect(() => {
+    if (isLoading) showLoader();
+    else hideLoader();
+  }, [isLoading]);
   const [selected, setSelected] = useState([]);
   const [dense, setDense] = useState(false);
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const dispatch = useDispatch();
+  const tableSettings = useSelector((s) => s.settings?.tables?.users || {});
+  const page = tableSettings.page ?? 0;
+  const rowsPerPage = tableSettings.rowsPerPage ?? 5;
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [openMenu, setOpenMenu] = useState(null);
+  const { showNotification } = useNotification();
+  const { showLoader, hideLoader } = useLoading();
+  const router = useRouter();
+
+
+
+  // persist filters/search to settings
+  useEffect(() => {
+    try {
+      dispatch({
+        type: "settings/setTableFilters",
+        payload: {
+          tableId: "users",
+          filters: { search, roleFilter, statusFilter },
+        },
+      });
+    } catch (e) {}
+  }, [search, roleFilter, statusFilter]);
 
   const filteredUsers = useMemo(() => {
     return users.filter((u) => {
       const q = search.trim().toLowerCase();
+      const fullName = `${u.firstName || ""} ${u.lastName || ""}`.toLowerCase();
       const matchesSearch =
         !q ||
-        `${u.firstName} ${u.lastName}`.toLowerCase().includes(q) ||
+        fullName.includes(q) ||
         (u.email || "").toLowerCase().includes(q) ||
+        (u.username || "").toLowerCase().includes(q) ||
         (u.phone || "").toLowerCase().includes(q) ||
         (u.position || "").toLowerCase().includes(q);
       const matchesRole = !roleFilter || u.role === roleFilter;
@@ -122,11 +112,11 @@ export default function UsersListTable() {
       setRoleFilter(role || "");
       setStatusFilter(status || "");
     }
-    setPage(0);
+    dispatch(setTablePagination({ tableId: "users", page: 0 }));
   };
 
   const handleSelectAll = (e) => {
-    if (e.target.checked) setSelected(filteredUsers.map((u) => u.id));
+    if (e.target.checked) setSelected(filteredUsers.map((u) => u.id || u._id));
     else setSelected([]);
   };
 
@@ -136,33 +126,50 @@ export default function UsersListTable() {
     );
   };
 
-  const handleChangePage = (_, newPage) => setPage(newPage);
+  const handleChangePage = (_, newPage) =>
+    dispatch(setTablePagination({ tableId: "users", page: newPage }));
+
   const handleChangeRowsPerPage = (e) => {
-    setRowsPerPage(parseInt(e.target.value, 10));
-    setPage(0);
+    const v = parseInt(e.target.value, 10);
+    dispatch(setTablePagination({ tableId: "users", rowsPerPage: v, page: 0 }));
   };
 
   const handleAddUser = () => {
-    // route to add user page or open modal
-    alert("Go to add user form");
+    router.push("/users/add-new-user");
   };
 
-  const handleToggleActive = (id) => {
-    setUsers((prev) =>
-      prev.map((u) => (u.id === id ? { ...u, active: !u.active } : u))
+  const handleToggleActive = async (id, currentStatus) => {
+    // Optimistic update
+    queryClient.setQueryData(["users_list"], (old) => 
+      old ? old.map((u) => (u.id === id || u._id === id ? { ...u, active: !currentStatus } : u)) : []
     );
+    
+    // TODO: Implement API call to toggle status if endpoint exists
+    // await UserService.update(id, { active: !currentStatus });
+    
     setOpenMenu(null);
   };
 
   const handleEditUser = (id) => {
-    alert(`Edit user ${id}`);
+    router.push(`/users/edit/${id}`); // Assuming edit page exists or will exist
     setOpenMenu(null);
   };
 
-  const handleDeleteUser = (id) => {
+  const handleDeleteUser = async (id) => {
     if (confirm("Are you sure you want to delete this user?")) {
-      setUsers((prev) => prev.filter((u) => u.id !== id));
-      setOpenMenu(null);
+      try {
+        showLoader();
+        await UserService.delete(id);
+        queryClient.setQueryData(["users_list"], (old) => 
+          old ? old.filter((u) => (u.id || u._id) !== id) : []
+        );
+        showNotification({ message: "User deleted", severity: "success" });
+      } catch (err) {
+        showNotification({ message: "Failed to delete user", severity: "error" });
+      } finally {
+        hideLoader();
+        setOpenMenu(null);
+      }
     }
   };
 
@@ -250,7 +257,7 @@ export default function UsersListTable() {
         </Box>
 
         <Box sx={{ overflowX: "auto", width: "100%" }}>
-          <TableContainer sx={{ minWidth: 1000 }}>
+          <TableContainer sx={{ minWidth: 1200 }}>
             <Table size={dense ? "small" : "medium"}>
               <TableHead>
                 <TableRow
@@ -273,12 +280,11 @@ export default function UsersListTable() {
                       onChange={handleSelectAll}
                     />
                   </TableCell>
-                  <TableCell>Name</TableCell>
-                  <TableCell>Email</TableCell>
-                  <TableCell>Phone</TableCell>
+                  <TableCell>User</TableCell>
+                  <TableCell>Contact</TableCell>
                   <TableCell>Role</TableCell>
-                  <TableCell>Position</TableCell>
-                  <TableCell>Company / Shop</TableCell>
+                  <TableCell>Work Info</TableCell>
+                  <TableCell>Assignments</TableCell>
                   <TableCell>Status</TableCell>
                   <TableCell align="center">Actions</TableCell>
                 </TableRow>
@@ -287,11 +293,13 @@ export default function UsersListTable() {
               <TableBody>
                 {filteredUsers
                   .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                  .map((u, index, arr) => (
+                  .map((u, index, arr) => {
+                    const userId = u.id || u._id;
+                    return (
                     <TableRow
-                      key={u.id}
+                      key={userId}
                       hover
-                      selected={selected.includes(u.id)}
+                      selected={selected.includes(userId)}
                       sx={{
                         "&:hover": {
                           backgroundColor: "#f4f6f8",
@@ -308,14 +316,15 @@ export default function UsersListTable() {
                     >
                       <TableCell padding="checkbox">
                         <Checkbox
-                          checked={selected.includes(u.id)}
-                          onChange={() => handleSelectRow(u.id)}
+                          checked={selected.includes(userId)}
+                          onChange={() => handleSelectRow(userId)}
                         />
                       </TableCell>
 
                       <TableCell>
                         <Box display="flex" alignItems="center" gap={1.5}>
                           <Avatar
+                            src={u.profilePicture}
                             sx={{
                               width: 36,
                               height: 36,
@@ -329,39 +338,53 @@ export default function UsersListTable() {
                             <Typography variant="subtitle2" fontWeight={600}>
                               {u.firstName} {u.lastName}
                             </Typography>
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                            >
-                              {u.nationalId}
-                            </Typography>
+                            {/* Username removed as it's not in API response */}
                           </Box>
                         </Box>
                       </TableCell>
 
-                      <TableCell>{u.email}</TableCell>
-                      <TableCell>{u.phone}</TableCell>
+                      <TableCell>
+                        <Typography variant="body2">{u.email}</Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {u.phone}
+                        </Typography>
+                      </TableCell>
+
                       <TableCell>
                         <Chip
-                          label={u.role}
+                          label={u.role?.replace("_", " ")}
                           size="small"
                           sx={{
                             backgroundColor: "#fff8f5",
                             color: "#ff782d",
                             fontWeight: 600,
+                            textTransform: "capitalize"
                           }}
                         />
                       </TableCell>
-                      <TableCell>{u.position || "-"}</TableCell>
+
                       <TableCell>
-                        {u.companies?.length ? u.companies.join(", ") : "-"}
-                        {u.shops?.length ? " / " + u.shops.join(", ") : ""}
+                        <Typography variant="body2">{u.position || "-"}</Typography>
+                        {u.department && (
+                          <Typography variant="caption" color="text.secondary">
+                            {u.department.replace("_", " ")}
+                          </Typography>
+                        )}
+                      </TableCell>
+
+                      <TableCell>
+                        <Typography variant="body2" noWrap sx={{ maxWidth: 150 }}>
+                          {u.companies?.length ? `${u.companies.length} Companies` : "-"}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary" noWrap sx={{ maxWidth: 150 }}>
+                          {u.shops?.length ? `${u.shops.length} Shops` : ""}
+                        </Typography>
                       </TableCell>
 
                       <TableCell>
                         <IOSSwitch
-                          checked={u.active}
-                          onChange={() => handleToggleActive(u.id)}
+                          checked={Boolean(u?.active)}
+                          onChange={() => handleToggleActive(userId, u.active)}
                         />
                       </TableCell>
 
@@ -371,14 +394,14 @@ export default function UsersListTable() {
                             <IconButton
                               size="small"
                               onClick={() =>
-                                setOpenMenu(openMenu === u.id ? null : u.id)
+                                setOpenMenu(openMenu === userId ? null : userId)
                               }
                             >
                               <HiDotsVertical />
                             </IconButton>
                           </Tooltip>
 
-                          {openMenu === u.id && (
+                          {openMenu === userId && (
                             <Box
                               sx={{
                                 position: "absolute",
@@ -395,7 +418,7 @@ export default function UsersListTable() {
                             >
                               <Box
                                 component="button"
-                                onClick={() => handleEditUser(u.id)}
+                                onClick={() => handleEditUser(userId)}
                                 sx={{
                                   width: "100%",
                                   display: "flex",
@@ -416,7 +439,7 @@ export default function UsersListTable() {
                               </Box>
                               <Box
                                 component="button"
-                                onClick={() => handleDeleteUser(u.id)}
+                                onClick={() => handleDeleteUser(userId)}
                                 sx={{
                                   width: "100%",
                                   display: "flex",
@@ -439,7 +462,8 @@ export default function UsersListTable() {
                         </Box>
                       </TableCell>
                     </TableRow>
-                  ))}
+                  );
+                })}
               </TableBody>
             </Table>
           </TableContainer>

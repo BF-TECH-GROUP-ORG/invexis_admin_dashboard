@@ -30,11 +30,11 @@ const AddCategoryPageHeader = () => {
         </h1>
 
         <Link
-          href="/categories"
+          href="/categories/list"
           className="flex items-center gap-2 px-6 py-3 rounded-2xl font-semibold bg-[#081422] text-white hover:bg-[#0b2036] transition-colors"
         >
-          <ChevronRight size={20} />
           View Categories
+          <ChevronRight size={20} />
         </Link>
       </div>
     </div>

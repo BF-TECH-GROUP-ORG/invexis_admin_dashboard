@@ -1,6 +1,9 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useHybridQuery } from "@/hooks/useHybridQuery";
+import { useDispatch, useSelector } from "react-redux";
 import {
   Card,
   Table,
@@ -23,146 +26,312 @@ import {
   MenuItem,
   InputAdornment,
 } from "@mui/material";
-import { HiDotsVertical, HiSearch, HiTrash, HiPencil } from "react-icons/hi";
+import {
+  HiDotsVertical,
+  HiSearch,
+  HiTrash,
+  HiPencil,
+  HiEye,
+  HiUpload,
+  HiBan,
+  HiCheckCircle,
+} from "react-icons/hi";
 import IOSSwitch from "../shared/IosSwitch";
 import UsersPageHeader from "./UsersPageHeader";
 import CompaniesAnalyticsCards from "./CompaniesAnalyticsCards";
 import { useRouter } from "next/navigation";
-
-const mockCompanies = [
-  {
-    name: "TechHub Rwanda Ltd",
-    domain: "techhub-rw-1763386831.com",
-    email: "shinjagiraarnold209@gmail.com",
-    phone: "+250788123456",
-    country: "Rwanda",
-    city: "Kigali",
-    address: "123 Innovation Street, Kigali",
-    tier: "pro",
-    industry: "Technology & Electronics",
-    employees: 150,
-    registrationNumber: "REG-2025-001",
-    status: "active",
-  },
-  {
-    name: "Innovate Africa Ltd",
-    domain: "innovate-africa.com",
-    email: "contact@innovate-africa.com",
-    phone: "+250788987654",
-    country: "Rwanda",
-    city: "Kigali",
-    address: "456 Startup Ave, Kigali",
-    tier: "mid",
-    industry: "Software & IT Services",
-    employees: 75,
-    registrationNumber: "REG-2025-002",
-    status: "active",
-  },
-  {
-    name: "GreenTech Solutions",
-    domain: "greentech-solutions.com",
-    email: "info@greentech-solutions.com",
-    phone: "+250789112233",
-    country: "Rwanda",
-    city: "Huye",
-    address: "789 Innovation Road, Huye",
-    tier: "basic",
-    industry: "Renewable Energy",
-    employees: 120,
-    registrationNumber: "REG-2025-003",
-    status: "active",
-  },
-];
+import CompanyService from "../../services/CompanyService";
+import { useNotification } from "../../providers/NotificationProvider";
+import { useLoading } from "../../providers/LoadingProvider";
+import CompanyDetailsModal from "./CompanyDetailsModal";
+import { setTablePagination } from "@/features/SettingsSlice";
+import api from "../../lib/axios";
 
 export default function CompaniesTable() {
-  const [companies, setCompanies] = useState(mockCompanies);
+  const queryClient = useQueryClient();
+  const tableSettings = useSelector((s) => s.settings?.tables?.companies || {});
+  const tableFilters = tableSettings.filters || {};
+  const [tierFilter, setTierFilter] = useState(tableFilters.tierFilter || "");
+  const [statusFilter, setStatusFilter] = useState(
+    tableFilters.statusFilter || ""
+  );
+  const [countryFilter, setCountryFilter] = useState(
+    tableFilters.countryFilter || ""
+  );
+  const page = tableSettings.page ?? 0;
+  const rowsPerPage = tableSettings.rowsPerPage ?? 5;
+
+  const {
+    data: companies = [],
+    isLoading: loading,
+    error,
+  } = useHybridQuery("companies_list", async () => {
+    const params = {};
+    if (tierFilter) params.tier = tierFilter;
+    if (statusFilter) params.status = statusFilter;
+    if (countryFilter) params.country = countryFilter;
+    params.limit = rowsPerPage || 50;
+    params.offset = page * (rowsPerPage || 50);
+
+    const data = await CompanyService.getAll(params);
+    return data?.data || data || [];
+  });
   const [selected, setSelected] = useState([]);
   const [dense, setDense] = useState(false);
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const dispatch = useDispatch();
   const [search, setSearch] = useState("");
-  const [tierFilter, setTierFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [countryFilter, setCountryFilter] = useState("");
   const [openMenu, setOpenMenu] = useState(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [detailsCompanyId, setDetailsCompanyId] = useState(null);
   const router = useRouter();
+  const { showNotification } = useNotification();
+  const { showLoader, hideLoader } = useLoading();
 
   const filteredCompanies = useMemo(() => {
     return companies.filter((c) => {
       const matchesSearch =
-        c.name.toLowerCase().includes(search.toLowerCase()) ||
-        c.email.toLowerCase().includes(search.toLowerCase()) ||
-        c.city.toLowerCase().includes(search.toLowerCase()) ||
-        c.tier.toLowerCase().includes(search.toLowerCase()) ||
-        c.industry.toLowerCase().includes(search.toLowerCase());
+        c.name?.toLowerCase().includes(search.toLowerCase()) ||
+        c.email?.toLowerCase().includes(search.toLowerCase()) ||
+        c.city?.toLowerCase().includes(search.toLowerCase()) ||
+        c.tier?.toLowerCase().includes(search.toLowerCase()) ||
+        c.industry?.toLowerCase().includes(search.toLowerCase());
       const matchesTier =
-        !tierFilter || c.tier.toLowerCase() === tierFilter.toLowerCase();
+        !tierFilter || c.tier?.toLowerCase() === tierFilter.toLowerCase();
       const matchesStatus = !statusFilter || c.status === statusFilter;
       const matchesCountry = !countryFilter || c.country === countryFilter;
       return matchesSearch && matchesTier && matchesStatus && matchesCountry;
     });
   }, [companies, search, tierFilter, statusFilter, countryFilter]);
 
+  useEffect(() => {
+    try {
+      dispatch(
+        setTablePagination({
+          tableId: "companies",
+        })
+      );
+    } catch (e) {}
+  }, []);
+
+  useEffect(() => {
+    try {
+      dispatch({
+        type: "settings/setTableFilters",
+        payload: {
+          tableId: "companies",
+          filters: { search, tierFilter, statusFilter, countryFilter },
+        },
+      });
+    } catch (e) {}
+  }, [search, tierFilter, statusFilter, countryFilter]);
+
   const handleSelectAll = (e) => {
     if (e.target.checked) {
-      setSelected(filteredCompanies.map((c) => c.registrationNumber));
+      setSelected(filteredCompanies.map((c) => c.id));
     } else {
       setSelected([]);
     }
   };
 
-  const handleSelectRow = (regNum) => {
+  const handleSelectRow = (id) => {
     setSelected((prev) =>
-      prev.includes(regNum)
-        ? prev.filter((r) => r !== regNum)
-        : [...prev, regNum]
+      prev.includes(id) ? prev.filter((r) => r !== id) : [...prev, id]
     );
   };
 
-  const handleChangePage = (_, newPage) => setPage(newPage);
+  const handleChangePage = (_, newPage) =>
+    dispatch(setTablePagination({ tableId: "companies", page: newPage }));
+
   const handleChangeRowsPerPage = (e) => {
-    setRowsPerPage(parseInt(e.target.value, 10));
-    setPage(0);
+    const v = parseInt(e.target.value, 10);
+    dispatch(
+      setTablePagination({ tableId: "companies", rowsPerPage: v, page: 0 })
+    );
   };
 
   const handleAddCompany = () => {
-    router.push("/inventory/companies/add-company");
+    router.push("/clients/new");
   };
 
-  const handleToggleStatus = (regNum) => {
-    setCompanies((prev) =>
-      prev.map((c) =>
-        c.registrationNumber === regNum
-          ? { ...c, status: c.status === "active" ? "inactive" : "active" }
-          : c
-      )
-    );
-  };
-
-  const handleEditCompany = (regNum) => {
-    router.push(`/clients/edit/${regNum}`);
-    setOpenMenu(null);
-  };
-
-  const handleDeleteCompany = (regNum) => {
-    if (confirm("Are you sure you want to delete this company?")) {
-      setCompanies((prev) =>
-        prev.filter((c) => c.registrationNumber !== regNum)
-      );
+  const handleDeactivate = async (id) => {
+    try {
+      showLoader();
+      await CompanyService.changeStatus(id, "deactivated");
+      showNotification({ message: "Company deactivated", severity: "success" });
+      queryClient.invalidateQueries(["companies_list"]);
+    } catch (err) {
+      showNotification({
+        message: "Failed to deactivate company",
+        severity: "error",
+      });
+    } finally {
+      hideLoader();
       setOpenMenu(null);
     }
   };
 
+  const handleReactivate = async (id) => {
+    try {
+      showLoader();
+      await CompanyService.reactivate(id);
+      showNotification({ message: "Company reactivated", severity: "success" });
+      queryClient.invalidateQueries(["companies_list"]);
+    } catch (err) {
+      showNotification({
+        message: "Failed to reactivate company",
+        severity: "error",
+      });
+    } finally {
+      hideLoader();
+      setOpenMenu(null);
+    }
+  };
+
+  const handleEditCompany = (id) => {
+    router.push(`/clients/edit/${id}`);
+    setOpenMenu(null);
+  };
+
+  const handleDeleteCompany = async (id) => {
+    if (!confirm("Are you sure you want to delete this company?")) return;
+    try {
+      showLoader();
+      await CompanyService.delete(id);
+      queryClient.setQueryData(["companies_list"], (old) =>
+        old ? old.filter((c) => c.id !== id) : []
+      );
+      showNotification({ message: "Company deleted", severity: "success" });
+    } catch (err) {
+      showNotification({
+        message: "Failed to delete company",
+        severity: "error",
+      });
+    } finally {
+      hideLoader();
+      <TableCell>
+        {/* Approval state: pending | active | deactivated */}
+        {(() => {
+          const docs = company.metadata?.verification?.documents || [];
+          const s = company.status;
+          let state = "pending";
+          if (s === "deactivated") state = "deactivated";
+          else if ((docs && docs.length > 0) || s === "active")
+            state = "active";
+          return (
+            <Chip
+              label={state}
+              size="small"
+              sx={{
+                backgroundColor:
+                  state === "active"
+                    ? "#E8F5E9"
+                    : state === "pending"
+                    ? "#FFF7ED"
+                    : "#FFECEC",
+                color:
+                  state === "active"
+                    ? "#2E7D32"
+                    : state === "pending"
+                    ? "#B45309"
+                    : "#B91C1C",
+                fontWeight: 700,
+              }}
+            />
+          );
+        })()}
+      </TableCell>;
+      setOpenMenu(null);
+    }
+  };
+
+  const handleViewDetails = (id) => {
+    router.push(`/clients/${id}`);
+    setOpenMenu(null);
+  };
+
+  const handleUploadPrompt = (id) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.multiple = true;
+    input.onchange = () => {
+      const files = input.files;
+      if (files && files.length) handleUploadDocuments(id, files);
+    };
+    input.click();
+    setOpenMenu(null);
+  };
+
+  const handleUploadDocuments = async (id, files) => {
+    const fd = new FormData();
+    Array.from(files).forEach((f) => fd.append("documents", f));
+    try {
+      showLoader();
+      await CompanyService.uploadVerificationDocs(id, fd);
+      showNotification({ message: "Documents uploaded", severity: "success" });
+      queryClient.invalidateQueries(["companies_list"]);
+    } catch (err) {
+      showNotification({ message: "Upload failed", severity: "error" });
+    } finally {
+      hideLoader();
+    }
+  };
+
   const getUniqueCountries = () => {
-    return [...new Set(companies.map((c) => c.country))].sort();
+    return [...new Set(companies.map((c) => c.country || ""))]
+      .filter(Boolean)
+      .sort();
+  };
+
+  const getStatusChip = (status) => {
+    let label = status;
+    let color = "default";
+    let bgColor = "#f3f4f6";
+    let textColor = "#374151";
+
+    if (status === "active") {
+      label = "Active";
+      bgColor = "#E8F5E9";
+      textColor = "#2E7D32";
+    } else if (status === "deactivated") {
+      label = "Deactivated";
+      bgColor = "#FFEBEE";
+      textColor = "#C62828";
+    } else if (status === "pending_verification" || status === "pending") {
+      label = "Pending";
+      bgColor = "#FFF3E0";
+      textColor = "#EF6C00";
+    }
+
+    return (
+      <Chip
+        label={label}
+        size="small"
+        sx={{
+          backgroundColor: bgColor,
+          color: textColor,
+          fontWeight: 600,
+          textTransform: "capitalize",
+        }}
+      />
+    );
   };
 
   return (
     <>
-      {/* Analytics Cards */}
       <CompaniesAnalyticsCards companies={filteredCompanies} />
 
-      {/* Companies Table Card */}
+      {loading && (
+        <Box px={2.5} py={2}>
+          <Typography variant="body2">Loading companies...</Typography>
+        </Box>
+      )}
+
+      {error && (
+        <Box px={2.5} py={2}>
+          <Typography color="error">{error}</Typography>
+        </Box>
+      )}
+
       <Card
         sx={{
           borderRadius: 0,
@@ -172,7 +341,6 @@ export default function CompaniesTable() {
       >
         <UsersPageHeader onAddUser={handleAddCompany} />
 
-        {/* 🔍 Top Controls - Search & Filters */}
         <Box
           display="flex"
           justifyContent="space-between"
@@ -220,7 +388,8 @@ export default function CompaniesTable() {
           >
             <MenuItem value="">All Status</MenuItem>
             <MenuItem value="active">Active</MenuItem>
-            <MenuItem value="inactive">Inactive</MenuItem>
+            <MenuItem value="pending_verification">Pending</MenuItem>
+            <MenuItem value="deactivated">Deactivated</MenuItem>
           </Select>
 
           <Select
@@ -239,7 +408,6 @@ export default function CompaniesTable() {
           </Select>
         </Box>
 
-        {/* 🧾 Scrollable Table */}
         <Box sx={{ overflowX: "auto", width: "100%" }}>
           <TableContainer sx={{ minWidth: 1000 }}>
             <Table size={dense ? "small" : "medium"}>
@@ -270,8 +438,6 @@ export default function CompaniesTable() {
                   <TableCell>Country</TableCell>
                   <TableCell>City</TableCell>
                   <TableCell>Tier</TableCell>
-                  <TableCell>Industry</TableCell>
-                  <TableCell>Employees</TableCell>
                   <TableCell>Status</TableCell>
                   <TableCell align="center">Actions</TableCell>
                 </TableRow>
@@ -282,9 +448,9 @@ export default function CompaniesTable() {
                   .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                   .map((company, index, arr) => (
                     <TableRow
-                      key={company.registrationNumber}
+                      key={company.id || index}
                       hover
-                      selected={selected.includes(company.registrationNumber)}
+                      selected={selected.includes(company.id)}
                       sx={{
                         "&:hover": {
                           backgroundColor: "#f4f6f8",
@@ -301,12 +467,8 @@ export default function CompaniesTable() {
                     >
                       <TableCell padding="checkbox">
                         <Checkbox
-                          checked={selected.includes(
-                            company.registrationNumber
-                          )}
-                          onChange={() =>
-                            handleSelectRow(company.registrationNumber)
-                          }
+                          checked={selected.includes(company.id)}
+                          onChange={() => handleSelectRow(company.id)}
                         />
                       </TableCell>
 
@@ -325,7 +487,7 @@ export default function CompaniesTable() {
                               variant="caption"
                               color="text.secondary"
                             >
-                              {company.registrationNumber}
+                              {company.id?.substring(0, 8)}...
                             </Typography>
                           </Box>
                         </Box>
@@ -353,31 +515,21 @@ export default function CompaniesTable() {
                                 ? "#B45309"
                                 : "#2E7D32",
                             fontWeight: 600,
+                            textTransform: "capitalize",
                           }}
                         />
                       </TableCell>
-                      <TableCell>{company.industry}</TableCell>
-                      <TableCell>{company.employees}</TableCell>
 
-                      <TableCell>
-                        <IOSSwitch
-                          checked={company.status === "active"}
-                          onChange={() =>
-                            handleToggleStatus(company.registrationNumber)
-                          }
-                        />
-                      </TableCell>
+                      <TableCell>{getStatusChip(company.status)}</TableCell>
 
                       <TableCell align="center" sx={{ position: "relative" }}>
                         <Box sx={{ position: "relative" }}>
                           <Tooltip title="More actions">
                             <IconButton
                               size="small"
-                              onClick={(e) =>
+                              onClick={() =>
                                 setOpenMenu(
-                                  openMenu === company.registrationNumber
-                                    ? null
-                                    : company.registrationNumber
+                                  openMenu === company.id ? null : company.id
                                 )
                               }
                             >
@@ -385,8 +537,7 @@ export default function CompaniesTable() {
                             </IconButton>
                           </Tooltip>
 
-                          {/* Action Menu Popup */}
-                          {openMenu === company.registrationNumber && (
+                          {openMenu === company.id && (
                             <Box
                               sx={{
                                 position: "absolute",
@@ -397,15 +548,13 @@ export default function CompaniesTable() {
                                 borderRadius: "8px",
                                 boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
                                 zIndex: 10,
-                                minWidth: 150,
+                                minWidth: 160,
                                 mt: 0.5,
                               }}
                             >
                               <Box
                                 component="button"
-                                onClick={() =>
-                                  handleEditCompany(company.registrationNumber)
-                                }
+                                onClick={() => handleViewDetails(company.id)}
                                 sx={{
                                   width: "100%",
                                   display: "flex",
@@ -419,21 +568,136 @@ export default function CompaniesTable() {
                                   fontSize: 14,
                                   color: "#081422",
                                   borderBottom: "1px solid #e5e7eb",
-                                  "&:hover": {
-                                    backgroundColor: "#f9fafb",
-                                  },
+                                  "&:hover": { backgroundColor: "#f9fafb" },
+                                }}
+                              >
+                                <HiEye size={16} />
+                                View Details
+                              </Box>
+
+                              <Box
+                                component="button"
+                                onClick={() => handleEditCompany(company.id)}
+                                sx={{
+                                  width: "100%",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 1,
+                                  px: 2,
+                                  py: 1.5,
+                                  border: "none",
+                                  backgroundColor: "transparent",
+                                  cursor: "pointer",
+                                  fontSize: 14,
+                                  color: "#081422",
+                                  borderBottom: "1px solid #e5e7eb",
+                                  "&:hover": { backgroundColor: "#f9fafb" },
                                 }}
                               >
                                 <HiPencil size={16} />
                                 Edit
                               </Box>
+
                               <Box
                                 component="button"
-                                onClick={() =>
-                                  handleDeleteCompany(
-                                    company.registrationNumber
-                                  )
-                                }
+                                onClick={() => handleUploadPrompt(company.id)}
+                                sx={{
+                                  width: "100%",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 1,
+                                  px: 2,
+                                  py: 1.5,
+                                  border: "none",
+                                  backgroundColor: "transparent",
+                                  cursor: "pointer",
+                                  fontSize: 14,
+                                  color: "#081422",
+                                  borderBottom: "1px solid #e5e7eb",
+                                  "&:hover": { backgroundColor: "#f9fafb" },
+                                }}
+                              >
+                                <HiUpload size={16} />
+                                Add Documents
+                              </Box>
+
+                              <Box
+                                component="button"
+                                onClick={() => {
+                                  router.push(`/clients/verify/${company.id}`);
+                                  setOpenMenu(null);
+                                }}
+                                sx={{
+                                  width: "100%",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 1,
+                                  px: 2,
+                                  py: 1.5,
+                                  border: "none",
+                                  backgroundColor: "transparent",
+                                  cursor: "pointer",
+                                  fontSize: 14,
+                                  color: "#081422",
+                                  borderBottom: "1px solid #e5e7eb",
+                                  "&:hover": { backgroundColor: "#f9fafb" },
+                                }}
+                              >
+                                <HiEye size={16} />
+                                Verify
+                              </Box>
+
+                              {company.status === "active" ? (
+                                <Box
+                                  component="button"
+                                  onClick={() => handleDeactivate(company.id)}
+                                  sx={{
+                                    width: "100%",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 1,
+                                    px: 2,
+                                    py: 1.5,
+                                    border: "none",
+                                    backgroundColor: "transparent",
+                                    cursor: "pointer",
+                                    fontSize: 14,
+                                    color: "#dc2626",
+                                    borderBottom: "1px solid #e5e7eb",
+                                    "&:hover": { backgroundColor: "#fee2e2" },
+                                  }}
+                                >
+                                  <HiBan size={16} />
+                                  Deactivate
+                                </Box>
+                              ) : (
+                                <Box
+                                  component="button"
+                                  onClick={() => handleReactivate(company.id)}
+                                  sx={{
+                                    width: "100%",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 1,
+                                    px: 2,
+                                    py: 1.5,
+                                    border: "none",
+                                    backgroundColor: "transparent",
+                                    cursor: "pointer",
+                                    fontSize: 14,
+                                    color: "#16a34a",
+                                    borderBottom: "1px solid #e5e7eb",
+                                    "&:hover": { backgroundColor: "#dcfce7" },
+                                  }}
+                                >
+                                  <HiCheckCircle size={16} />
+                                  Reactivate
+                                </Box>
+                              )}
+
+                              <Box
+                                component="button"
+                                onClick={() => handleDeleteCompany(company.id)}
                                 sx={{
                                   width: "100%",
                                   display: "flex",
@@ -446,9 +710,7 @@ export default function CompaniesTable() {
                                   cursor: "pointer",
                                   fontSize: 14,
                                   color: "#dc2626",
-                                  "&:hover": {
-                                    backgroundColor: "#fee2e2",
-                                  },
+                                  "&:hover": { backgroundColor: "#fee2e2" },
                                 }}
                               >
                                 <HiTrash size={16} />
@@ -465,7 +727,6 @@ export default function CompaniesTable() {
           </TableContainer>
         </Box>
 
-        {/* ⚙️ Bottom Controls */}
         <Box
           display="flex"
           justifyContent="space-between"
@@ -507,6 +768,11 @@ export default function CompaniesTable() {
           />
         </Box>
       </Card>
+      <CompanyDetailsModal
+        open={detailsOpen}
+        onClose={() => setDetailsOpen(false)}
+        companyId={detailsCompanyId}
+      />
     </>
   );
 }

@@ -19,6 +19,8 @@ import {
   LogOut,
 } from "lucide-react";
 
+import {logout} from "@/services/AuthService"
+
 const navItems = [
   {
     title: "Dashboard",
@@ -32,8 +34,6 @@ const navItems = [
     children: [
       { title: "All Companies", path: "/clients/list" },
       { title: "Add New Company", path: "/clients/new" },
-      { title: "Bulk Import", path: "/clients/bulk" },
-      { title: "Unlock Accounts", path: "/clients/unlock" },
     ],
   },
 
@@ -223,6 +223,7 @@ export default function SideBar({
           <button
             className="w-full flex items-center justify-center gap-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors duration-200"
             title={expanded ? "Logout" : "Logout"}
+            onClick={logout}
           >
             <LogOut size={22} />
             {expanded && <span className="font-medium">Logout</span>}
