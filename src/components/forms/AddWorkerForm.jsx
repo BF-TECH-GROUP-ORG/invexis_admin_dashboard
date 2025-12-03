@@ -12,6 +12,7 @@ import {
 } from "@mui/material";
 import { HiArrowRight } from "react-icons/hi2";
 import { ThemeRegistry } from "@/providers/ThemeRegistry";
+import { useNavigation } from "@/hooks/useNavigation";
 
 const positions = [
   "Sales Representative",
@@ -25,6 +26,7 @@ const departments = ["sales", "finance", "logistics", "hr"];
 const genders = ["male", "female", "other"];
 
 export default function AddWorkerForm({ onSubmit }) {
+  const { navigateTo } = useNavigation();
   const [worker, setWorker] = useState({
     firstName: "",
     lastName: "",

@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { useHybridQuery } from "@/hooks/useHybridQuery";
+import { useState, useEffect } from "react";
 import StatCard from "@/components/dashboard/StatCard";
 import SalesAnalyticsChart from "@/components/dashboard/SalesAnalyticsChart";
 import TrendingInsightsTable from "@/components/dashboard/TrendingInsightsTable";
@@ -9,8 +8,8 @@ import TopSellingCompaniesChart from "@/components/dashboard/TopSellingCompanies
 import ActiveInactiveCompaniesChart from "@/components/dashboard/ActiveInactiveCompaniesChart";
 import TierDistributionChart from "@/components/dashboard/TierDistributionChart";
 import RecentCompaniesCard from "@/components/dashboard/RecentCompaniesCard";
-import api from "@/lib/axios";
 import UserService from "@/services/UserService";
+import CompanyService from "@/services/CompanyService";
 
 import {
   salesDataMonthly,
@@ -22,26 +21,39 @@ import {
 export default function DashboardHome() {
   const [salesPeriod, setSalesPeriod] = useState("monthly");
   const [trendsPeriod, setTrendsPeriod] = useState("yearly");
+  const [companies, setCompanies] = useState([]);
+  const [userCount, setUserCount] = useState(0);
+  const [loading, setLoading] = useState(true);
 
-  // Hybrid Query for Companies
-  const { data: companies = [] } = useHybridQuery(
-    "dashboard_companies",
-    async () => {
-      const data = await (
-        await import("@/services/CompanyService")
-      ).default.getAll({ limit: 200 });
-      return data?.data || data || [];
-    }
-  );
+  // Fetch companies directly from API
+  useEffect(() => {
+    const fetchCompanies = async () => {
+      try {
+        const data = await CompanyService.getAll({ limit: 200 });
+        setCompanies(data?.data || data || []);
+      } catch (error) {
+        console.error("Failed to fetch companies:", error);
+        setCompanies([]);
+      }
+    };
+    fetchCompanies();
+  }, []);
 
-  // Hybrid Query for User Count
-  const { data: userCount = 0 } = useHybridQuery(
-    "dashboard_user_count",
-    async () => {
-      const res = await UserService.getAll({ page: 1, limit: 1 });
-      return res?.pagination?.totalItems || res?.data?.length || 0;
-    }
-  );
+  // Fetch user count directly from API
+  useEffect(() => {
+    const fetchUserCount = async () => {
+      try {
+        const res = await UserService.getAll({ page: 1, limit: 1 });
+        setUserCount(res?.pagination?.totalItems || res?.data?.length || 0);
+      } catch (error) {
+        console.error("Failed to fetch user count:", error);
+        setUserCount(0);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchUserCount();
+  }, []);
 
   const getSalesData = () => salesDataMonthly;
 

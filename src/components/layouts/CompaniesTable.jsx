@@ -1,8 +1,6 @@
 "use client";
 
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { useHybridQuery } from "@/hooks/useHybridQuery";
 import { useDispatch, useSelector } from "react-redux";
 import {
   Card,
@@ -45,10 +43,8 @@ import { useNotification } from "../../providers/NotificationProvider";
 import { useLoading } from "../../providers/LoadingProvider";
 import CompanyDetailsModal from "./CompanyDetailsModal";
 import { setTablePagination } from "@/features/SettingsSlice";
-import api from "../../lib/axios";
 
 export default function CompaniesTable() {
-  const queryClient = useQueryClient();
   const tableSettings = useSelector((s) => s.settings?.tables?.companies || {});
   const tableFilters = tableSettings.filters || {};
   const [tierFilter, setTierFilter] = useState(tableFilters.tierFilter || "");
@@ -61,21 +57,36 @@ export default function CompaniesTable() {
   const page = tableSettings.page ?? 0;
   const rowsPerPage = tableSettings.rowsPerPage ?? 5;
 
-  const {
-    data: companies = [],
-    isLoading: loading,
-    error,
-  } = useHybridQuery("companies_list", async () => {
-    const params = {};
-    if (tierFilter) params.tier = tierFilter;
-    if (statusFilter) params.status = statusFilter;
-    if (countryFilter) params.country = countryFilter;
-    params.limit = rowsPerPage || 50;
-    params.offset = page * (rowsPerPage || 50);
+  // Direct API state instead of useHybridQuery
+  const [companies, setCompanies] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-    const data = await CompanyService.getAll(params);
-    return data?.data || data || [];
-  });
+  // Fetch companies directly from API
+  useEffect(() => {
+    const fetchCompanies = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const params = {};
+        if (tierFilter) params.tier = tierFilter;
+        if (statusFilter) params.status = statusFilter;
+        if (countryFilter) params.country = countryFilter;
+        params.limit = rowsPerPage || 50;
+        params.offset = page * (rowsPerPage || 50);
+
+        const data = await CompanyService.getAll(params);
+        setCompanies(data?.data || data || []);
+      } catch (err) {
+        console.error("Failed to fetch companies:", err);
+        setError(err.message);
+        setCompanies([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchCompanies();
+  }, [tierFilter, statusFilter, countryFilter, page, rowsPerPage]);
   const [selected, setSelected] = useState([]);
   const [dense, setDense] = useState(false);
   const dispatch = useDispatch();
@@ -110,7 +121,7 @@ export default function CompaniesTable() {
           tableId: "companies",
         })
       );
-    } catch (e) {}
+    } catch (e) { }
   }, []);
 
   useEffect(() => {
@@ -122,7 +133,7 @@ export default function CompaniesTable() {
           filters: { search, tierFilter, statusFilter, countryFilter },
         },
       });
-    } catch (e) {}
+    } catch (e) { }
   }, [search, tierFilter, statusFilter, countryFilter]);
 
   const handleSelectAll = (e) => {
@@ -158,7 +169,8 @@ export default function CompaniesTable() {
       showLoader();
       await CompanyService.changeStatus(id, "deactivated");
       showNotification({ message: "Company deactivated", severity: "success" });
-      queryClient.invalidateQueries(["companies_list"]);
+      // Refetch companies instead of invalidating query
+      setCompanies((prev) => prev.map((c) => c.id === id ? { ...c, status: "deactivated" } : c));
     } catch (err) {
       showNotification({
         message: "Failed to deactivate company",
@@ -175,7 +187,8 @@ export default function CompaniesTable() {
       showLoader();
       await CompanyService.reactivate(id);
       showNotification({ message: "Company reactivated", severity: "success" });
-      queryClient.invalidateQueries(["companies_list"]);
+      // Refetch companies instead of invalidating query
+      setCompanies((prev) => prev.map((c) => c.id === id ? { ...c, status: "active" } : c));
     } catch (err) {
       showNotification({
         message: "Failed to reactivate company",
@@ -197,9 +210,7 @@ export default function CompaniesTable() {
     try {
       showLoader();
       await CompanyService.delete(id);
-      queryClient.setQueryData(["companies_list"], (old) =>
-        old ? old.filter((c) => c.id !== id) : []
-      );
+      setCompanies((prev) => prev.filter((c) => c.id !== id));
       showNotification({ message: "Company deleted", severity: "success" });
     } catch (err) {
       showNotification({
@@ -208,38 +219,6 @@ export default function CompaniesTable() {
       });
     } finally {
       hideLoader();
-      <TableCell>
-        {/* Approval state: pending | active | deactivated */}
-        {(() => {
-          const docs = company.metadata?.verification?.documents || [];
-          const s = company.status;
-          let state = "pending";
-          if (s === "deactivated") state = "deactivated";
-          else if ((docs && docs.length > 0) || s === "active")
-            state = "active";
-          return (
-            <Chip
-              label={state}
-              size="small"
-              sx={{
-                backgroundColor:
-                  state === "active"
-                    ? "#E8F5E9"
-                    : state === "pending"
-                    ? "#FFF7ED"
-                    : "#FFECEC",
-                color:
-                  state === "active"
-                    ? "#2E7D32"
-                    : state === "pending"
-                    ? "#B45309"
-                    : "#B91C1C",
-                fontWeight: 700,
-              }}
-            />
-          );
-        })()}
-      </TableCell>;
       setOpenMenu(null);
     }
   };
@@ -268,7 +247,14 @@ export default function CompaniesTable() {
       showLoader();
       await CompanyService.uploadVerificationDocs(id, fd);
       showNotification({ message: "Documents uploaded", severity: "success" });
-      queryClient.invalidateQueries(["companies_list"]);
+      // Refetch the company to update the UI
+      setCompanies((prev) =>
+        prev.map((c) =>
+          c.id === id
+            ? { ...c, metadata: { ...c.metadata, verification: { ...c.metadata?.verification, documents: [...(c.metadata?.verification?.documents || []), ...Array.from(files).map((f) => f.name)] } } }
+            : c
+        )
+      );
     } catch (err) {
       showNotification({ message: "Upload failed", severity: "error" });
     } finally {
@@ -506,14 +492,14 @@ export default function CompaniesTable() {
                               company.tier === "pro"
                                 ? "#E0F2FE"
                                 : company.tier === "mid"
-                                ? "#FEF3C7"
-                                : "#E8F5E9",
+                                  ? "#FEF3C7"
+                                  : "#E8F5E9",
                             color:
                               company.tier === "pro"
                                 ? "#0369A1"
                                 : company.tier === "mid"
-                                ? "#B45309"
-                                : "#2E7D32",
+                                  ? "#B45309"
+                                  : "#2E7D32",
                             fontWeight: 600,
                             textTransform: "capitalize",
                           }}

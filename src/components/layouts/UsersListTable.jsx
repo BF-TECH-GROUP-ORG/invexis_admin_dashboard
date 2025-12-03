@@ -1,8 +1,6 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { useHybridQuery } from "@/hooks/useHybridQuery";
 import { useDispatch, useSelector } from "react-redux";
 import { setTablePagination } from "@/features/SettingsSlice";
 import {
@@ -37,24 +35,30 @@ import UserService from "@/services/UserService";
 import { useRouter } from "next/navigation";
 
 export default function UsersListTable() {
-  const queryClient = useQueryClient();
-  
-  const { data: users = [], isLoading, error } = useHybridQuery("users_list", async () => {
-    try {
-      const res = await UserService.getAll();
-      console.log("Users API Response:", res);
-      return res.users || res.data || (Array.isArray(res) ? res : []);
-    } catch (err) {
-      console.error("Failed to fetch users:", err);
-      throw err;
-    }
-  });
+  // Direct API state instead of useHybridQuery
+  const [users, setUsers] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  // Sync global loader with query loading state
+  // Fetch users directly from API
   useEffect(() => {
-    if (isLoading) showLoader();
-    else hideLoader();
-  }, [isLoading]);
+    const fetchUsers = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const res = await UserService.getAll();
+        const userData = res.users || res.data || (Array.isArray(res) ? res : []);
+        setUsers(userData);
+      } catch (err) {
+        console.error("Failed to fetch users:", err);
+        setError(err.message);
+        setUsers([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchUsers();
+  }, []);
   const [selected, setSelected] = useState([]);
   const [dense, setDense] = useState(false);
   const dispatch = useDispatch();
@@ -81,7 +85,7 @@ export default function UsersListTable() {
           filters: { search, roleFilter, statusFilter },
         },
       });
-    } catch (e) {}
+    } catch (e) { }
   }, [search, roleFilter, statusFilter]);
 
   const filteredUsers = useMemo(() => {
@@ -140,13 +144,13 @@ export default function UsersListTable() {
 
   const handleToggleActive = async (id, currentStatus) => {
     // Optimistic update
-    queryClient.setQueryData(["users_list"], (old) => 
+    queryClient.setQueryData(["users_list"], (old) =>
       old ? old.map((u) => (u.id === id || u._id === id ? { ...u, active: !currentStatus } : u)) : []
     );
-    
+
     // TODO: Implement API call to toggle status if endpoint exists
     // await UserService.update(id, { active: !currentStatus });
-    
+
     setOpenMenu(null);
   };
 
@@ -160,7 +164,7 @@ export default function UsersListTable() {
       try {
         showLoader();
         await UserService.delete(id);
-        queryClient.setQueryData(["users_list"], (old) => 
+        queryClient.setQueryData(["users_list"], (old) =>
           old ? old.filter((u) => (u.id || u._id) !== id) : []
         );
         showNotification({ message: "User deleted", severity: "success" });
@@ -283,8 +287,8 @@ export default function UsersListTable() {
                   <TableCell>User</TableCell>
                   <TableCell>Contact</TableCell>
                   <TableCell>Role</TableCell>
-                  <TableCell>Work Info</TableCell>
-                  <TableCell>Assignments</TableCell>
+                  <TableCell>Company</TableCell>
+                  {/* <TableCell>Assignments</TableCell> */}
                   <TableCell>Status</TableCell>
                   <TableCell align="center">Actions</TableCell>
                 </TableRow>
@@ -296,174 +300,174 @@ export default function UsersListTable() {
                   .map((u, index, arr) => {
                     const userId = u.id || u._id;
                     return (
-                    <TableRow
-                      key={userId}
-                      hover
-                      selected={selected.includes(userId)}
-                      sx={{
-                        "&:hover": {
-                          backgroundColor: "#f4f6f8",
-                          "& td:first-of-type":
-                            index === arr.length - 1
-                              ? { borderBottomLeftRadius: 12 }
-                              : {},
-                          "& td:last-of-type":
-                            index === arr.length - 1
-                              ? { borderBottomRightRadius: 12 }
-                              : {},
-                        },
-                      }}
-                    >
-                      <TableCell padding="checkbox">
-                        <Checkbox
-                          checked={selected.includes(userId)}
-                          onChange={() => handleSelectRow(userId)}
-                        />
-                      </TableCell>
+                      <TableRow
+                        key={userId}
+                        hover
+                        selected={selected.includes(userId)}
+                        sx={{
+                          "&:hover": {
+                            backgroundColor: "#f4f6f8",
+                            "& td:first-of-type":
+                              index === arr.length - 1
+                                ? { borderBottomLeftRadius: 12 }
+                                : {},
+                            "& td:last-of-type":
+                              index === arr.length - 1
+                                ? { borderBottomRightRadius: 12 }
+                                : {},
+                          },
+                        }}
+                      >
+                        <TableCell padding="checkbox">
+                          <Checkbox
+                            checked={selected.includes(userId)}
+                            onChange={() => handleSelectRow(userId)}
+                          />
+                        </TableCell>
 
-                      <TableCell>
-                        <Box display="flex" alignItems="center" gap={1.5}>
-                          <Avatar
-                            src={u.profilePicture}
-                            sx={{
-                              width: 36,
-                              height: 36,
-                              bgcolor: "#fff8f5",
-                              color: "#ff782d",
-                            }}
-                          >
-                            {(u.firstName || "")[0]}
-                          </Avatar>
-                          <Box>
-                            <Typography variant="subtitle2" fontWeight={600}>
-                              {u.firstName} {u.lastName}
-                            </Typography>
-                            {/* Username removed as it's not in API response */}
-                          </Box>
-                        </Box>
-                      </TableCell>
-
-                      <TableCell>
-                        <Typography variant="body2">{u.email}</Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {u.phone}
-                        </Typography>
-                      </TableCell>
-
-                      <TableCell>
-                        <Chip
-                          label={u.role?.replace("_", " ")}
-                          size="small"
-                          sx={{
-                            backgroundColor: "#fff8f5",
-                            color: "#ff782d",
-                            fontWeight: 600,
-                            textTransform: "capitalize"
-                          }}
-                        />
-                      </TableCell>
-
-                      <TableCell>
-                        <Typography variant="body2">{u.position || "-"}</Typography>
-                        {u.department && (
-                          <Typography variant="caption" color="text.secondary">
-                            {u.department.replace("_", " ")}
-                          </Typography>
-                        )}
-                      </TableCell>
-
-                      <TableCell>
-                        <Typography variant="body2" noWrap sx={{ maxWidth: 150 }}>
-                          {u.companies?.length ? `${u.companies.length} Companies` : "-"}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary" noWrap sx={{ maxWidth: 150 }}>
-                          {u.shops?.length ? `${u.shops.length} Shops` : ""}
-                        </Typography>
-                      </TableCell>
-
-                      <TableCell>
-                        <IOSSwitch
-                          checked={Boolean(u?.active)}
-                          onChange={() => handleToggleActive(userId, u.active)}
-                        />
-                      </TableCell>
-
-                      <TableCell align="center" sx={{ position: "relative" }}>
-                        <Box sx={{ position: "relative" }}>
-                          <Tooltip title="More actions">
-                            <IconButton
-                              size="small"
-                              onClick={() =>
-                                setOpenMenu(openMenu === userId ? null : userId)
-                              }
-                            >
-                              <HiDotsVertical />
-                            </IconButton>
-                          </Tooltip>
-
-                          {openMenu === userId && (
-                            <Box
+                        <TableCell>
+                          <Box display="flex" alignItems="center" gap={1.5}>
+                            <Avatar
+                              src={u.profilePicture}
                               sx={{
-                                position: "absolute",
-                                top: "100%",
-                                right: 0,
-                                backgroundColor: "white",
-                                border: "1px solid #e5e7eb",
-                                borderRadius: "8px",
-                                boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
-                                zIndex: 10,
-                                minWidth: 150,
-                                mt: 0.5,
+                                width: 36,
+                                height: 36,
+                                bgcolor: "#fff8f5",
+                                color: "#ff782d",
                               }}
                             >
-                              <Box
-                                component="button"
-                                onClick={() => handleEditUser(userId)}
-                                sx={{
-                                  width: "100%",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: 1,
-                                  px: 2,
-                                  py: 1.5,
-                                  border: "none",
-                                  backgroundColor: "transparent",
-                                  cursor: "pointer",
-                                  fontSize: 14,
-                                  color: "#081422",
-                                  borderBottom: "1px solid #e5e7eb",
-                                  "&:hover": { backgroundColor: "#f9fafb" },
-                                }}
-                              >
-                                <HiPencil size={16} /> Edit
-                              </Box>
-                              <Box
-                                component="button"
-                                onClick={() => handleDeleteUser(userId)}
-                                sx={{
-                                  width: "100%",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: 1,
-                                  px: 2,
-                                  py: 1.5,
-                                  border: "none",
-                                  backgroundColor: "transparent",
-                                  cursor: "pointer",
-                                  fontSize: 14,
-                                  color: "#dc2626",
-                                  "&:hover": { backgroundColor: "#fee2e2" },
-                                }}
-                              >
-                                <HiTrash size={16} /> Delete
-                              </Box>
+                              {(u.firstName || "")[0]}
+                            </Avatar>
+                            <Box>
+                              <Typography variant="subtitle2" fontWeight={600}>
+                                {u.firstName} {u.lastName}
+                              </Typography>
+                              {/* Username removed as it's not in API response */}
                             </Box>
+                          </Box>
+                        </TableCell>
+
+                        <TableCell>
+                          <Typography variant="body2">{u.email}</Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {u.phone}
+                          </Typography>
+                        </TableCell>
+
+                        <TableCell>
+                          <Chip
+                            label={u.role?.replace("_", " ")}
+                            size="small"
+                            sx={{
+                              backgroundColor: "#fff8f5",
+                              color: "#ff782d",
+                              fontWeight: 600,
+                              textTransform: "capitalize"
+                            }}
+                          />
+                        </TableCell>
+
+                        <TableCell>
+                          <Typography variant="body2">{u.position || "-"}</Typography>
+                          {u.department && (
+                            <Typography variant="caption" color="text.secondary">
+                              {u.department.replace("_", " ")}
+                            </Typography>
                           )}
-                        </Box>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
+                        </TableCell>
+
+                        <TableCell>
+                          <Typography variant="body2" noWrap sx={{ maxWidth: 150 }}>
+                            {u.companies?.length ? `${u.companies.length} Companies` : "-"}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary" noWrap sx={{ maxWidth: 150 }}>
+                            {u.shops?.length ? `${u.shops.length} Shops` : ""}
+                          </Typography>
+                        </TableCell>
+
+                        <TableCell>
+                          <IOSSwitch
+                            checked={Boolean(u?.accountStatus)}
+                            onChange={() => handleToggleActive(userId, u.accountStatus)}
+                          />
+                        </TableCell>
+
+                        <TableCell align="center" sx={{ position: "relative" }}>
+                          <Box sx={{ position: "relative" }}>
+                            <Tooltip title="More actions">
+                              <IconButton
+                                size="small"
+                                onClick={() =>
+                                  setOpenMenu(openMenu === userId ? null : userId)
+                                }
+                              >
+                                <HiDotsVertical />
+                              </IconButton>
+                            </Tooltip>
+
+                            {openMenu === userId && (
+                              <Box
+                                sx={{
+                                  position: "absolute",
+                                  top: "100%",
+                                  right: 0,
+                                  backgroundColor: "white",
+                                  border: "1px solid #e5e7eb",
+                                  borderRadius: "8px",
+                                  boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+                                  zIndex: 10,
+                                  minWidth: 150,
+                                  mt: 0.5,
+                                }}
+                              >
+                                <Box
+                                  component="button"
+                                  onClick={() => handleEditUser(userId)}
+                                  sx={{
+                                    width: "100%",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 1,
+                                    px: 2,
+                                    py: 1.5,
+                                    border: "none",
+                                    backgroundColor: "transparent",
+                                    cursor: "pointer",
+                                    fontSize: 14,
+                                    color: "#081422",
+                                    borderBottom: "1px solid #e5e7eb",
+                                    "&:hover": { backgroundColor: "#f9fafb" },
+                                  }}
+                                >
+                                  <HiPencil size={16} /> Edit
+                                </Box>
+                                <Box
+                                  component="button"
+                                  onClick={() => handleDeleteUser(userId)}
+                                  sx={{
+                                    width: "100%",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 1,
+                                    px: 2,
+                                    py: 1.5,
+                                    border: "none",
+                                    backgroundColor: "transparent",
+                                    cursor: "pointer",
+                                    fontSize: 14,
+                                    color: "#dc2626",
+                                    "&:hover": { backgroundColor: "#fee2e2" },
+                                  }}
+                                >
+                                  <HiTrash size={16} /> Delete
+                                </Box>
+                              </Box>
+                            )}
+                          </Box>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
               </TableBody>
             </Table>
           </TableContainer>

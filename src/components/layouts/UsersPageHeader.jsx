@@ -3,6 +3,7 @@
 import React from "react";
 import { Box, Typography, Breadcrumbs, Link, Button } from "@mui/material";
 import { HiUserAdd } from "react-icons/hi";
+import NextLink from "next/link";
 
 export default function UsersPageHeader({
   onAddUser,
@@ -40,6 +41,8 @@ export default function UsersPageHeader({
               underline="hover"
               color="#7a7a7a"
               href={b.href}
+              component={NextLink}
+              prefetch={true}
               sx={{ fontWeight: 500, "&:hover": { color: "#081422" } }}
             >
               {b.label}
@@ -83,7 +86,7 @@ export default function UsersPageHeader({
               "&:hover": { backgroundColor: "#0b2036" },
             }}
           >
-            <Link href={link} className="text-white underline-none">{addLabel}</Link>
+            <NextLink href={link} prefetch={true} className="text-white underline-none">{addLabel}</NextLink>
           </Button>
         ) : null}
       </Box>
