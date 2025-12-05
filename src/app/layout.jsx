@@ -14,26 +14,18 @@ export const metadata = {
   description: "Invexis Admin Dashboard",
 };
 
-import QueryProvider from "@/providers/QueryProvider";
-
-import AuthProvider from "@/providers/AuthProvider";
-
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body className={`font-metropolis antialiased`}>
         <ClientProviders>
-          <QueryProvider>
-            <ThemeRegistry>
-              <LoadingProvider>
-                <NotificationProvider>
-                  <AuthProvider>
-                    <ProtectedRoute>{children}</ProtectedRoute>
-                  </AuthProvider>
-                </NotificationProvider>
-              </LoadingProvider>
-            </ThemeRegistry>
-          </QueryProvider>
+          <ThemeRegistry>
+            <LoadingProvider>
+              <NotificationProvider>
+                <ProtectedRoute>{children}</ProtectedRoute>
+              </NotificationProvider>
+            </LoadingProvider>
+          </ThemeRegistry>
         </ClientProviders>
       </body>
     </html>

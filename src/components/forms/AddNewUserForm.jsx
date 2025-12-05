@@ -28,13 +28,9 @@ const AddNewUserForm = () => {
 
     // Personal Details
     phone: "",
-    gender: "other",
+    gender: "male",
     dateOfBirth: "",
     nationalId: "",
-
-    // Role & Work
-    role: "worker",
-    position: "",
 
     // Address
     street: "",
@@ -46,23 +42,20 @@ const AddNewUserForm = () => {
     // Emergency Contact
     emergencyName: "",
     emergencyPhone: "",
+
+    // Preferences
+    language: "en",
+    notificationsEmail: true,
+    notificationsSms: true,
+    notificationsInApp: true,
+
+    // Role (Fixed as company_admin)
+    role: "company_admin",
   });
 
   const [errors, setErrors] = useState({});
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
-  // Dummy shops data
-  // dummy shops removed
-
-  const roles = [
-    "super_admin",
-    "company_admin",
-    "shop_manager",
-    "worker",
-    "customer",
-  ];
-  // department selection removed - keep Role, Position, Active only
 
   const steps = [
     {
@@ -77,39 +70,23 @@ const AddNewUserForm = () => {
     },
     {
       id: 3,
-      title: "Role & Work",
-      fields: ["role", "position"],
+      title: "Address",
+      fields: ["street", "city", "state", "postalCode", "country"],
     },
     {
       id: 4,
-      title: "Address & Emergency",
-      fields: [
-        "street",
-        "city",
-        "state",
-        "postalCode",
-        "country",
-        "emergencyName",
-        "emergencyPhone",
-      ],
+      title: "Emergency & Preferences",
+      fields: ["emergencyName", "emergencyPhone", "language", "notificationsEmail", "notificationsSms", "notificationsInApp"],
     },
   ];
-
-  // companies/shops logic removed
 
   const handleInputChange = (field, value) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) setErrors((e) => ({ ...e, [field]: undefined }));
   };
 
-  // company/shop selection removed
-
   const validateStep = (stepId) => {
     const newErrors = {};
-    const role = formData.role;
-    const isCustomer = role === "customer";
-    const isSuperAdmin = role === "super_admin";
-    const isWorkerOrManager = ["worker", "shop_manager"].includes(role);
 
     // Step 1: Basic Info
     if (stepId === 1) {
@@ -134,34 +111,24 @@ const AddNewUserForm = () => {
       else if (!/^\+?[1-9]\d{1,14}$/.test(formData.phone.replace(/\s/g, "")))
         newErrors.phone = "Invalid E.164 phone";
 
-      if (isCustomer && !formData.dateOfBirth)
-        newErrors.dateOfBirth = "Date of Birth is required for customers";
-
-      if (!isCustomer && !formData.nationalId?.trim())
-        newErrors.nationalId = "National ID is required";
+      if (!formData.dateOfBirth) newErrors.dateOfBirth = "Date of Birth is required";
+      if (!formData.nationalId?.trim()) newErrors.nationalId = "National ID is required";
     }
 
-    // Step 3: Role & Work
+    // Step 3: Address
     if (stepId === 3) {
-      if (!formData.role) newErrors.role = "Role is required";
-
-      if (!isCustomer && !isSuperAdmin && !formData.position?.trim())
-        newErrors.position = "Position is required";
-      // Only require position for non-super_admin/non-customer
+      if (!formData.street?.trim()) newErrors.street = "Street is required";
+      if (!formData.city?.trim()) newErrors.city = "City is required";
+      if (!formData.state?.trim()) newErrors.state = "State is required";
+      if (!formData.postalCode?.trim()) newErrors.postalCode = "Postal Code is required";
+      if (!formData.country?.trim()) newErrors.country = "Country is required";
     }
 
-    // Step 4: Address & Emergency
+    // Step 4: Emergency & Preferences
     if (stepId === 4) {
-      if (!isCustomer) {
-        if (!formData.street?.trim()) newErrors.street = "Street is required";
-        if (!formData.country?.trim())
-          newErrors.country = "Country is required";
-
-        if (!formData.emergencyName?.trim())
-          newErrors.emergencyName = "Emergency contact name is required";
-        if (!formData.emergencyPhone?.trim())
-          newErrors.emergencyPhone = "Emergency contact phone is required";
-      }
+      if (!formData.emergencyName?.trim()) newErrors.emergencyName = "Emergency contact name is required";
+      if (!formData.emergencyPhone?.trim()) newErrors.emergencyPhone = "Emergency contact phone is required";
+      else if (!/^\+?[1-9]\d{1,14}$/.test(formData.emergencyPhone.replace(/\s/g, ""))) newErrors.emergencyPhone = "Invalid phone";
     }
 
     setErrors(newErrors);
@@ -189,13 +156,9 @@ const AddNewUserForm = () => {
       phone: formData.phone,
       password: formData.password,
       gender: formData.gender,
-      role: formData.role,
-      permissions: [],
-
-      ...(formData.dateOfBirth && { dateOfBirth: formData.dateOfBirth }),
-      ...(formData.nationalId && { nationalId: formData.nationalId }),
-      ...(formData.position && { position: formData.position }),
-
+      dateOfBirth: formData.dateOfBirth,
+      nationalId: formData.nationalId,
+      role: "company_admin",
       address: {
         street: formData.street,
         city: formData.city,
@@ -207,34 +170,35 @@ const AddNewUserForm = () => {
         name: formData.emergencyName,
         phone: formData.emergencyPhone,
       },
+      preferences: {
+        language: formData.language,
+        notifications: {
+          email: formData.notificationsEmail,
+          sms: formData.notificationsSms,
+          inApp: formData.notificationsInApp,
+        },
+      },
     };
 
     try {
       showLoader();
 
-      // Step 1: Create user in Auth service
-      const userResponse = await UserService.create(payload);
-      const createdUser =
-        userResponse.user || userResponse.data || userResponse;
+      // Register user in Auth service
+      const userResponse = await UserService.register(payload);
+      const createdUser = userResponse.user || userResponse.data || userResponse;
       const userId = createdUser._id || createdUser.id;
 
       if (!userId) {
         throw new Error("User created but ID not returned from server");
       }
 
-      showNotification({
-        message: "User created successfully",
-        severity: "success",
-      });
-
-      queryClient.invalidateQueries({ queryKey: ["users_list"] });
-
+      showNotification({ message: "Company Admin created successfully", severity: "success" });
       router.push("/users/list");
     } catch (err) {
-      console.error("Create user failed", err);
+      console.error("Register user failed", err);
       showNotification({
-        message: err.response?.data?.message || "Failed to create user",
-        severity: "error",
+        message: err.response?.data?.message || "Failed to create company admin",
+        severity: "error"
       });
     } finally {
       hideLoader();
@@ -263,11 +227,8 @@ const AddNewUserForm = () => {
         value={formData[field]}
         onChange={(e) => handleInputChange(field, e.target.value)}
         placeholder={placeholder}
-        className={`w-full px-4 py-3 rounded-2xl border-2 outline-none transition-all focus:border-[#ff782d] ${
-          errors[field]
-            ? "border-red-500"
-            : "border-[#d1d5db] hover:border-[#ff782d]"
-        } bg-white text-[#081422] placeholder-[#6b7280]`}
+        className={`w-full px-4 py-3 rounded-2xl border-2 outline-none transition-all focus:border-[#ff782d] ${errors[field] ? "border-red-500" : "border-[#d1d5db] hover:border-[#ff782d]"
+          } bg-white text-[#081422] placeholder-[#6b7280]`}
       />
       {errors[field] && (
         <p className="text-red-500 text-sm mt-1">{errors[field]}</p>
@@ -283,10 +244,10 @@ const AddNewUserForm = () => {
             <div className="border-2 border-[#d1d5db] rounded-3xl p-8 md:p-12 bg-white">
               <div className="mb-8">
                 <h2 className="text-3xl font-bold text-[#081422]">
-                  {currentStepData.title}
+                  Register Company Admin
                 </h2>
                 <p className="text-[#6b7280] mt-2">
-                  Step {currentStep} of {steps.length}
+                  {currentStepData.title} - Step {currentStep} of {steps.length}
                 </p>
               </div>
 
@@ -294,27 +255,9 @@ const AddNewUserForm = () => {
                 {/* Step 1: Basic Info */}
                 {currentStep === 1 && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {renderInput(
-                      "First Name",
-                      "firstName",
-                      "text",
-                      "e.g., John",
-                      true
-                    )}
-                    {renderInput(
-                      "Last Name",
-                      "lastName",
-                      "text",
-                      "e.g., Doe",
-                      true
-                    )}
-                    {renderInput(
-                      "Email Address",
-                      "email",
-                      "email",
-                      "e.g., user@example.com",
-                      true
-                    )}
+                    {renderInput("First Name", "firstName", "text", "e.g., Company", true)}
+                    {renderInput("Last Name", "lastName", "text", "e.g., Admin", true)}
+                    {renderInput("Email Address", "email", "email", "e.g., company.admin@company.com", true)}
 
                     <div className="relative">
                       <label className="block text-sm font-semibold text-[#081422] mb-2">
@@ -327,11 +270,8 @@ const AddNewUserForm = () => {
                           handleInputChange("password", e.target.value)
                         }
                         placeholder="Min 8 characters"
-                        className={`w-full px-4 py-3 rounded-2xl border-2 outline-none transition-all focus:border-[#ff782d] ${
-                          errors.password
-                            ? "border-red-500"
-                            : "border-[#d1d5db] hover:border-[#ff782d]"
-                        } bg-white text-[#081422]`}
+                        className={`w-full px-4 py-3 rounded-2xl border-2 outline-none transition-all focus:border-[#ff782d] ${errors.password ? "border-red-500" : "border-[#d1d5db] hover:border-[#ff782d]"
+                          } bg-white text-[#081422]`}
                       />
                       <button
                         type="button"
@@ -362,11 +302,8 @@ const AddNewUserForm = () => {
                           handleInputChange("confirmPassword", e.target.value)
                         }
                         placeholder="Repeat password"
-                        className={`w-full px-4 py-3 rounded-2xl border-2 outline-none transition-all focus:border-[#ff782d] ${
-                          errors.confirmPassword
-                            ? "border-red-500"
-                            : "border-[#d1d5db] hover:border-[#ff782d]"
-                        } bg-white text-[#081422]`}
+                        className={`w-full px-4 py-3 rounded-2xl border-2 outline-none transition-all focus:border-[#ff782d] ${errors.confirmPassword ? "border-red-500" : "border-[#d1d5db] hover:border-[#ff782d]"
+                          } bg-white text-[#081422]`}
                       />
                       <button
                         type="button"
@@ -393,13 +330,7 @@ const AddNewUserForm = () => {
                 {/* Step 2: Personal Details */}
                 {currentStep === 2 && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {renderInput(
-                      "Phone Number",
-                      "phone",
-                      "tel",
-                      "e.g., +250788123456",
-                      true
-                    )}
+                    {renderInput("Phone Number", "phone", "tel", "e.g., +250789123459", true)}
 
                     <div>
                       <label className="block text-sm font-semibold text-[#081422] mb-2">
@@ -418,120 +349,79 @@ const AddNewUserForm = () => {
                       </select>
                     </div>
 
-                    {renderInput(
-                      "Date of Birth",
-                      "dateOfBirth",
-                      "date",
-                      "",
-                      formData.role === "customer"
-                    )}
-                    {renderInput(
-                      "National ID",
-                      "nationalId",
-                      "text",
-                      "e.g., 1199...",
-                      formData.role !== "customer"
-                    )}
+                    {renderInput("Date of Birth", "dateOfBirth", "date", "", true)}
+                    {renderInput("National ID", "nationalId", "text", "e.g., COMP12345", true)}
                   </div>
                 )}
 
-                {/* Step 3: Role & Work */}
+                {/* Step 3: Address */}
                 {currentStep === 3 && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-semibold text-[#081422] mb-2">
-                        Role <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        value={formData.role}
-                        onChange={(e) =>
-                          handleInputChange("role", e.target.value)
-                        }
-                        className="w-full px-4 py-3 rounded-2xl border-2 border-[#d1d5db] bg-white text-[#081422]"
-                      >
-                        {roles.map((r) => (
-                          <option key={r} value={r} className="capitalize">
-                            {r.replace("_", " ")}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    {renderInput(
-                      "Position",
-                      "position",
-                      "text",
-                      "e.g., Manager",
-                      formData.role !== "customer" &&
-                        formData.role !== "super_admin"
-                    )}
-                    
-                    {/* <div className="flex items-center gap-3 md:col-span-2">
-                      <input
-                        id="active"
-                        type="checkbox"
-                        checked={formData.active}
-                        onChange={(e) =>
-                          handleInputChange("active", e.target.checked)
-                        }
-                        className="w-4 h-4 accent-[#ff782d]"
-                      />
-                      <label
-                        htmlFor="active"
-                        className="text-sm font-medium text-[#081422]"
-                      >
-                        Active Account
-                      </label>
-                    </div> */}
+                    {renderInput("Street", "street", "text", "e.g., 456 Company Street", true)}
+                    {renderInput("City", "city", "text", "e.g., Kigali", true)}
+                    {renderInput("State", "state", "text", "e.g., Kigali", true)}
+                    {renderInput("Postal Code", "postalCode", "text", "e.g., 00000", true)}
+                    {renderInput("Country", "country", "text", "e.g., Rwanda", true)}
                   </div>
                 )}
 
-                {/* Step 4: Address & Emergency */}
+                {/* Step 4: Emergency & Preferences */}
                 {currentStep === 4 && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="md:col-span-2">
-                      <h3 className="font-semibold text-gray-900 mb-4">
-                        Address
-                      </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {renderInput(
-                          "Street",
-                          "street",
-                          "text",
-                          "",
-                          formData.role !== "customer"
-                        )}
-                        {renderInput("City", "city", "text")}
-                        {renderInput("State", "state", "text")}
-                        {renderInput("Postal Code", "postalCode", "text")}
-                        {renderInput(
-                          "Country",
-                          "country",
-                          "text",
-                          "",
-                          formData.role !== "customer"
-                        )}
-                      </div>
+                    <div className="md:col-span-2 border-b pb-6 mb-6">
+                      <h3 className="text-lg font-semibold text-[#081422] mb-4">Emergency Contact</h3>
+                      {renderInput("Contact Name", "emergencyName", "text", "e.g., Emergency Contact", true)}
+                      {renderInput("Contact Phone", "emergencyPhone", "tel", "e.g., +250789123460", true)}
                     </div>
 
-                    <div className="md:col-span-2 border-t pt-6">
-                      <h3 className="font-semibold text-gray-900 mb-4">
-                        Emergency Contact
-                      </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {renderInput(
-                          "Contact Name",
-                          "emergencyName",
-                          "text",
-                          "",
-                          formData.role !== "customer"
-                        )}
-                        {renderInput(
-                          "Contact Phone",
-                          "emergencyPhone",
-                          "tel",
-                          "",
-                          formData.role !== "customer"
-                        )}
+                    <div className="md:col-span-2">
+                      <h3 className="text-lg font-semibold text-[#081422] mb-4">Preferences</h3>
+
+                      <div className="mb-4">
+                        <label className="block text-sm font-semibold text-[#081422] mb-2">Language</label>
+                        <select
+                          value={formData.language}
+                          onChange={(e) => handleInputChange("language", e.target.value)}
+                          className="w-full px-4 py-3 rounded-2xl border-2 border-[#d1d5db] bg-white text-[#081422]"
+                        >
+                          <option value="en">English</option>
+                          <option value="fr">French</option>
+                          <option value="rw">Kinyarwanda</option>
+                        </select>
+                      </div>
+
+                      <div className="border-2 border-[#d1d5db] rounded-2xl p-4 space-y-3">
+                        <p className="text-sm font-semibold text-[#081422]">Notification Preferences</p>
+
+                        <label className="flex items-center gap-3 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={formData.notificationsEmail}
+                            onChange={(e) => handleInputChange("notificationsEmail", e.target.checked)}
+                            className="w-4 h-4 accent-[#ff782d]"
+                          />
+                          <span className="text-sm text-[#081422]">Email Notifications</span>
+                        </label>
+
+                        <label className="flex items-center gap-3 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={formData.notificationsSms}
+                            onChange={(e) => handleInputChange("notificationsSms", e.target.checked)}
+                            className="w-4 h-4 accent-[#ff782d]"
+                          />
+                          <span className="text-sm text-[#081422]">SMS Notifications</span>
+                        </label>
+
+                        <label className="flex items-center gap-3 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={formData.notificationsInApp}
+                            onChange={(e) => handleInputChange("notificationsInApp", e.target.checked)}
+                            className="w-4 h-4 accent-[#ff782d]"
+                          />
+                          <span className="text-sm text-[#081422]">In-App Notifications</span>
+                        </label>
                       </div>
                     </div>
                   </div>
@@ -563,7 +453,7 @@ const AddNewUserForm = () => {
                         type="submit"
                         className="flex items-center gap-2 px-6 py-3 rounded-2xl font-semibold bg-[#ff782d] text-white hover:bg-[#ff6b1a]"
                       >
-                        <Check size={18} /> Save User
+                        <Check size={18} /> Create Admin
                       </button>
                     ) : (
                       <button
@@ -592,13 +482,12 @@ const AddNewUserForm = () => {
                 {steps.map((step) => (
                   <div key={step.id} className="flex items-start gap-4">
                     <div
-                      className={`w-14 h-14 rounded-full flex items-center justify-center font-semibold transition-all flex-shrink-0 ${
-                        step.id < currentStep
-                          ? "bg-[#ff782d] text-white"
-                          : step.id === currentStep
+                      className={`w-14 h-14 rounded-full flex items-center justify-center font-semibold transition-all flex-shrink-0 ${step.id < currentStep
+                        ? "bg-[#ff782d] text-white"
+                        : step.id === currentStep
                           ? "bg-[#ff782d] text-white border-4 border-[#fff8f5] ring-2 ring-[#ff782d]"
                           : "border-2 border-[#d1d5db] text-[#6b7280] bg-white"
-                      }`}
+                        }`}
                     >
                       {step.id < currentStep ? <Check size={24} /> : step.id}
                     </div>

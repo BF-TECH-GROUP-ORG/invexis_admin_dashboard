@@ -19,11 +19,15 @@ import {
   LogOut,
 } from "lucide-react";
 
+<<<<<<< HEAD
 // NOTE: use performLogout via redux so client caches and local storage are cleared
 import { useDispatch } from "react-redux";
 import { useRouter } from "next/navigation";
 import { performLogout } from "@/features/AuthSlice";
 import { useQueryClient } from "@tanstack/react-query";
+=======
+import { logout } from "@/services/AuthService";
+>>>>>>> 6306822d6611d9b0d890ad2382bfe6a02f2a7747
 
 const navItems = [
   {
@@ -142,9 +146,8 @@ export default function SideBar({
   return (
     <>
       <aside
-        className={`fixed top-0 left-0 z-30 h-screen flex flex-col bg-white border-r border-gray-200 transition-[width] duration-300 ease-in-out ${
-          expanded ? "w-64" : "w-16"
-        }`}
+        className={`fixed top-0 left-0 z-30 h-screen flex flex-col bg-white border-r border-gray-200 transition-[width] duration-300 ease-in-out ${expanded ? "w-64" : "w-16"
+          }`}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-3 py-4 border-b border-gray-200 flex-shrink-0">
@@ -174,13 +177,12 @@ export default function SideBar({
               className="mb-2"
             >
               <div
-                className={`flex items-center justify-between px-3 py-2 rounded-r-lg hover:bg-[#ff782d]/10 cursor-pointer transition-all border-l-4 ${
-                  pathname === item.path ||
+                className={`flex items-center justify-between px-3 py-2 rounded-r-lg hover:bg-[#ff782d]/10 cursor-pointer transition-all border-l-4 ${pathname === item.path ||
                   (item.children &&
                     item.children.some((child) => pathname === child.path))
-                    ? "border-l-[#ff782d] bg-[#ff782d]/5 text-[#ff782d] font-semibold"
-                    : "border-l-transparent text-gray-700 hover:text-[#ff782d]"
-                }`}
+                  ? "border-l-[#ff782d] bg-[#ff782d]/5 text-[#ff782d] font-semibold"
+                  : "border-l-transparent text-gray-700 hover:text-[#ff782d]"
+                  }`}
                 onClick={() =>
                   expanded && item.children && toggleMenu(item.title)
                 }
@@ -204,9 +206,8 @@ export default function SideBar({
                 {item.children && expanded && (
                   <ChevronDown
                     size={20}
-                    className={`transition-transform ${
-                      openMenus.includes(item.title) ? "rotate-180" : "rotate-0"
-                    }`}
+                    className={`transition-transform ${openMenus.includes(item.title) ? "rotate-180" : "rotate-0"
+                      }`}
                   />
                 )}
               </div>
@@ -218,11 +219,11 @@ export default function SideBar({
                     <Link
                       key={child.title}
                       href={child.path}
-                      className={`text-left px-3 py-2 text-sm rounded transition-colors border-l-4 ${
-                        pathname === child.path
-                          ? "border-l-[#ff782d] bg-[#ff782d]/5 text-[#ff782d] font-semibold"
-                          : "border-l-transparent text-gray-500 hover:bg-[#ff782d]/5 hover:text-[#ff782d]"
-                      }`}
+                      prefetch={true}
+                      className={`text-left px-3 py-2 text-sm rounded transition-colors border-l-4 ${pathname === child.path
+                        ? "border-l-[#ff782d] bg-[#ff782d]/5 text-[#ff782d] font-semibold"
+                        : "border-l-transparent text-gray-500 hover:bg-[#ff782d]/5 hover:text-[#ff782d]"
+                        }`}
                     >
                       {child.title}
                     </Link>
@@ -282,11 +283,11 @@ export default function SideBar({
                 <Link
                   key={child.title}
                   href={child.path}
-                  className={`block px-3 py-2 text-sm transition-colors cursor-pointer ${
-                    pathname === child.path
-                      ? "bg-[#ff782d]/15 text-[#ff782d] font-semibold hover:bg-[#ff782d]/20"
-                      : "text-gray-700 hover:bg-gray-100 hover:text-[#081422]"
-                  }`}
+                  prefetch={true}
+                  className={`block px-3 py-2 text-sm transition-colors cursor-pointer ${pathname === child.path
+                    ? "bg-[#ff782d]/15 text-[#ff782d] font-semibold hover:bg-[#ff782d]/20"
+                    : "text-gray-700 hover:bg-gray-100 hover:text-[#081422]"
+                    }`}
                 >
                   {child.title}
                 </Link>

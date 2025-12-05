@@ -9,6 +9,7 @@ const AddCategoryPageHeader = () => {
       <div className="flex items-center gap-2 text-sm text-[#6b7280] mb-3 ml-1">
         <Link
           href="/"
+          prefetch={true}
           className="hover:text-[#081422] transition-colors font-medium"
         >
           Dashboard
@@ -16,6 +17,7 @@ const AddCategoryPageHeader = () => {
         <ChevronRight size={16} className="text-[#6b7280]" />
         <Link
           href="/categories"
+          prefetch={true}
           className="hover:text-[#081422] transition-colors font-medium"
         >
           Categories
@@ -31,6 +33,7 @@ const AddCategoryPageHeader = () => {
 
         <Link
           href="/categories/list"
+          prefetch={true}
           className="flex items-center gap-2 px-6 py-3 rounded-2xl font-semibold bg-[#081422] text-white hover:bg-[#0b2036] transition-colors"
         >
           View Categories
