@@ -60,6 +60,11 @@ const UserService = {
     const res = await api.post(`/auth/verify/${id}`);
     return res.data;
   },
+  getCompanyAdmins: async () => {
+    const res = await api.get("/auth/users/company-admins");
+    return res.data;
+  },
 };
+
 
 export default UserService;

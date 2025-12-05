@@ -6,6 +6,7 @@ import { ChevronRight, ChevronLeft, Check, Search, X } from "lucide-react";
 import { useNotification } from "../../providers/NotificationProvider";
 import CompanyService from "../../services/CompanyService";
 import CategoryService from "../../services/CategoryService";
+import UserService from "../../services/UserService";
 import { COUNTRIES } from "../../constants/countries";
 
 const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
@@ -19,7 +20,13 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
     country: "",
     city: "",
     tier: "",
+    company_admin_id: "",
     category_ids: [],
+    industry: "",
+    size: "",
+    notificationsEmail: true,
+    notificationsSms: true,
+    notificationsInApp: true,
   });
 
   const [errors, setErrors] = useState({});
@@ -28,6 +35,11 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
   // Categories state
   const [categoriesList, setCategoriesList] = useState([]);
   const [categoryStats, setCategoryStats] = useState({ level1: 0, level3: 0 });
+
+  // Company Admins state
+  const [companyAdmins, setCompanyAdmins] = useState([]);
+  const [adminSearch, setAdminSearch] = useState("");
+  const [isAdminDropdownOpen, setIsAdminDropdownOpen] = useState(false);
 
   // Country search state
   const [countrySearch, setCountrySearch] = useState("");
@@ -41,7 +53,22 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
     );
   }, [countrySearch]);
 
+  // Filtered admins
+  const filteredAdmins = useMemo(() => {
+    if (!adminSearch) return companyAdmins;
+    return companyAdmins.filter((admin) => {
+      const fullName = `${admin.firstName} ${admin.lastName}`.toLowerCase();
+      return (
+        fullName.includes(adminSearch.toLowerCase()) ||
+        admin.email.toLowerCase().includes(adminSearch.toLowerCase())
+      );
+    });
+  }, [adminSearch, companyAdmins]);
+
   const selectedCountry = COUNTRIES.find((c) => c.name === formData.country);
+  const selectedAdmin = companyAdmins.find(
+    (admin) => admin._id === formData.company_admin_id
+  );
 
   // If editing, populate form with initial data
   useEffect(() => {
@@ -55,10 +82,35 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
         country: initialData.country || "",
         city: initialData.city || "",
         tier: initialData.tier ?? "",
+        company_admin_id: initialData.company_admin_id || "",
         category_ids: initialData.category_ids || [],
+        industry: initialData.metadata?.industry || "",
+        size: initialData.metadata?.size || "",
+        notificationsEmail:
+          initialData.notification_preferences?.email ?? true,
+        notificationsSms: initialData.notification_preferences?.sms ?? true,
+        notificationsInApp:
+          initialData.notification_preferences?.inApp ?? true,
       }));
     }
   }, [initialData]);
+
+  // Fetch company admins
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await UserService.getCompanyAdmins();
+        if (mounted) {
+          const admins = res?.admins || res?.data || [];
+          setCompanyAdmins(admins);
+        }
+      } catch (e) {
+        console.error("Failed to fetch company admins", e);
+      }
+    })();
+    return () => (mounted = false);
+  }, []);
 
   // Fetch categories (Level 2 only for selection)
   useEffect(() => {
@@ -122,8 +174,18 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
   const steps = [
     { id: 1, title: "Basic Info", fields: ["name", "domain", "email"] },
     { id: 2, title: "Contact Details", fields: ["phone", "country", "city"] },
-    { id: 3, title: "Categories", fields: ["category_ids"] },
-    { id: 4, title: "Plan Selection", fields: ["tier"] },
+    { id: 3, title: "Company Admin", fields: ["company_admin_id"] },
+    { id: 4, title: "Categories", fields: ["category_ids"] },
+    { id: 5, title: "Plan & Details", fields: ["tier", "industry", "size"] },
+    {
+      id: 6,
+      title: "Notifications",
+      fields: [
+        "notificationsEmail",
+        "notificationsSms",
+        "notificationsInApp",
+      ],
+    },
   ];
 
   const handleInputChange = (field, value) => {
@@ -187,7 +249,11 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!validateStep(currentStep)) return;
+
+    // Only validate on the last step
+    if (currentStep !== steps.length) {
+      return;
+    }
 
     const payload = {
       name: formData.name,
@@ -197,7 +263,17 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
       country: formData.country || null,
       city: formData.city || null,
       tier: formData.tier || null,
+      company_admin_id: formData.company_admin_id || null,
       category_ids: formData.category_ids || [],
+      metadata: {
+        industry: formData.industry || null,
+        size: formData.size || null,
+      },
+      notification_preferences: {
+        email: formData.notificationsEmail,
+        sms: formData.notificationsSms,
+        inApp: formData.notificationsInApp,
+      },
     };
 
     try {
@@ -211,7 +287,7 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
       if (res?.success || res?.id || res?.data?.success) {
         try {
           localStorage.removeItem("companies_cache_v1");
-        } catch (e) {}
+        } catch (e) { }
 
         showNotification({
           message: initialData ? "Company updated" : "Company added",
@@ -274,11 +350,10 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
                           handleInputChange("name", e.target.value)
                         }
                         placeholder="e.g., TechHub Rwanda Ltd"
-                        className={`w-full px-4 py-3 rounded-2xl border-2 outline-none transition-all focus:border-[#ff782d] ${
-                          errors.name
-                            ? "border-red-500"
-                            : "border-[#d1d5db] hover:border-[#ff782d]"
-                        } bg-white text-[#081422] placeholder-[#6b7280]`}
+                        className={`w-full px-4 py-3 rounded-2xl border-2 outline-none transition-all focus:border-[#ff782d] ${errors.name
+                          ? "border-red-500"
+                          : "border-[#d1d5db] hover:border-[#ff782d]"
+                          } bg-white text-[#081422] placeholder-[#6b7280]`}
                       />
                       {errors.name && (
                         <p className="text-red-500 text-sm mt-1">
@@ -298,11 +373,10 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
                           handleInputChange("domain", e.target.value)
                         }
                         placeholder="e.g., techhub-rw-1763386831.com"
-                        className={`w-full px-4 py-3 rounded-2xl border-2 outline-none transition-all focus:border-[#ff782d] ${
-                          errors.domain
-                            ? "border-red-500"
-                            : "border-[#d1d5db] hover:border-[#ff782d]"
-                        } bg-white text-[#081422] placeholder-[#6b7280]`}
+                        className={`w-full px-4 py-3 rounded-2xl border-2 outline-none transition-all focus:border-[#ff782d] ${errors.domain
+                          ? "border-red-500"
+                          : "border-[#d1d5db] hover:border-[#ff782d]"
+                          } bg-white text-[#081422] placeholder-[#6b7280]`}
                       />
                       {errors.domain && (
                         <p className="text-red-500 text-sm mt-1">
@@ -322,11 +396,10 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
                           handleInputChange("email", e.target.value)
                         }
                         placeholder="e.g., info@company.com"
-                        className={`w-full px-4 py-3 rounded-2xl border-2 outline-none transition-all focus:border-[#ff782d] ${
-                          errors.email
-                            ? "border-red-500"
-                            : "border-[#d1d5db] hover:border-[#ff782d]"
-                        } bg-white text-[#081422] placeholder-[#6b7280]`}
+                        className={`w-full px-4 py-3 rounded-2xl border-2 outline-none transition-all focus:border-[#ff782d] ${errors.email
+                          ? "border-red-500"
+                          : "border-[#d1d5db] hover:border-[#ff782d]"
+                          } bg-white text-[#081422] placeholder-[#6b7280]`}
                       />
                       {errors.email && (
                         <p className="text-red-500 text-sm mt-1">
@@ -351,11 +424,10 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
                           handleInputChange("phone", e.target.value)
                         }
                         placeholder="e.g., +250788123456"
-                        className={`w-full px-4 py-3 rounded-2xl border-2 outline-none transition-all focus:border-[#ff782d] ${
-                          errors.phone
-                            ? "border-red-500"
-                            : "border-[#d1d5db] hover:border-[#ff782d]"
-                        } bg-white text-[#081422] placeholder-[#6b7280]`}
+                        className={`w-full px-4 py-3 rounded-2xl border-2 outline-none transition-all focus:border-[#ff782d] ${errors.phone
+                          ? "border-red-500"
+                          : "border-[#d1d5db] hover:border-[#ff782d]"
+                          } bg-white text-[#081422] placeholder-[#6b7280]`}
                       />
                       {errors.phone && (
                         <p className="text-red-500 text-sm mt-1">
@@ -369,11 +441,10 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
                         Country
                       </label>
                       <div
-                        className={`w-full px-4 py-3 rounded-2xl border-2 outline-none transition-all cursor-pointer flex items-center justify-between ${
-                          errors.country
-                            ? "border-red-500"
-                            : "border-[#d1d5db] hover:border-[#ff782d]"
-                        } bg-white text-[#081422]`}
+                        className={`w-full px-4 py-3 rounded-2xl border-2 outline-none transition-all cursor-pointer flex items-center justify-between ${errors.country
+                          ? "border-red-500"
+                          : "border-[#d1d5db] hover:border-[#ff782d]"
+                          } bg-white text-[#081422]`}
                         onClick={() =>
                           setIsCountryDropdownOpen(!isCountryDropdownOpen)
                         }
@@ -386,9 +457,8 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
                             : formData.country || "Select a country"}
                         </span>
                         <ChevronRight
-                          className={`transform transition-transform ${
-                            isCountryDropdownOpen ? "rotate-90" : ""
-                          }`}
+                          className={`transform transition-transform ${isCountryDropdownOpen ? "rotate-90" : ""
+                            }`}
                           size={20}
                         />
                       </div>
@@ -414,11 +484,10 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
                                   setIsCountryDropdownOpen(false);
                                   setCountrySearch("");
                                 }}
-                                className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors ${
-                                  formData.country === c.name
-                                    ? "bg-[#fff8f5] text-[#ff782d]"
-                                    : "hover:bg-[#f3f4f6] text-[#081422]"
-                                }`}
+                                className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors ${formData.country === c.name
+                                  ? "bg-[#fff8f5] text-[#ff782d]"
+                                  : "hover:bg-[#f3f4f6] text-[#081422]"
+                                  }`}
                               >
                                 <span className="text-2xl">{c.flag}</span>
                                 <span className="font-medium">{c.name}</span>
@@ -450,11 +519,10 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
                           handleInputChange("city", e.target.value)
                         }
                         placeholder="e.g., Kigali"
-                        className={`w-full px-4 py-3 rounded-2xl border-2 outline-none transition-all focus:border-[#ff782d] ${
-                          errors.city
-                            ? "border-red-500"
-                            : "border-[#d1d5db] hover:border-[#ff782d]"
-                        } bg-white text-[#081422] placeholder-[#6b7280]`}
+                        className={`w-full px-4 py-3 rounded-2xl border-2 outline-none transition-all focus:border-[#ff782d] ${errors.city
+                          ? "border-red-500"
+                          : "border-[#d1d5db] hover:border-[#ff782d]"
+                          } bg-white text-[#081422] placeholder-[#6b7280]`}
                       />
                       {errors.city && (
                         <p className="text-red-500 text-sm mt-1">
@@ -465,8 +533,96 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
                   </>
                 )}
 
-                {/* Step 3: Categories */}
+                {/* Step 3: Company Admin */}
                 {currentStep === 3 && (
+                  <>
+                    <div className="relative">
+                      <label className="block text-sm font-semibold text-[#081422] mb-2">
+                        Select Company Admin
+                      </label>
+                      <div
+                        className={`w-full px-4 py-3 rounded-2xl border-2 outline-none transition-all cursor-pointer flex items-center justify-between ${errors.company_admin_id
+                          ? "border-red-500"
+                          : "border-[#d1d5db] hover:border-[#ff782d]"
+                          } bg-white text-[#081422]`}
+                        onClick={() =>
+                          setIsAdminDropdownOpen(!isAdminDropdownOpen)
+                        }
+                      >
+                        <span
+                          className={!formData.company_admin_id ? "text-[#6b7280]" : ""}
+                        >
+                          {selectedAdmin
+                            ? `${selectedAdmin.firstName} ${selectedAdmin.lastName} (${selectedAdmin.email})`
+                            : "Select a company admin"}
+                        </span>
+                        <ChevronRight
+                          className={`transform transition-transform ${isAdminDropdownOpen ? "rotate-90" : ""
+                            }`}
+                          size={20}
+                        />
+                      </div>
+                      {/* Dropdown contents */}
+                      {isAdminDropdownOpen && (
+                        <div className="absolute left-0 mt-2 w-full bg-white border-2 border-[#d1d5db] rounded-2xl shadow-lg z-50">
+                          <div className="p-3">
+                            <input
+                              type="text"
+                              value={adminSearch}
+                              onChange={(e) => setAdminSearch(e.target.value)}
+                              placeholder="Search admin by name or email..."
+                              autoFocus
+                              className="w-full px-3 py-2 rounded-xl border-2 outline-none focus:border-[#ff782d] bg-white text-[#081422] placeholder-[#6b7280]"
+                            />
+                          </div>
+                          <div className="overflow-y-auto max-h-56 p-2">
+                            {filteredAdmins.length > 0 ? (
+                              filteredAdmins.map((admin) => (
+                                <div
+                                  key={admin._id}
+                                  onClick={() => {
+                                    handleInputChange(
+                                      "company_admin_id",
+                                      admin._id
+                                    );
+                                    setIsAdminDropdownOpen(false);
+                                    setAdminSearch("");
+                                  }}
+                                  className={`flex flex-col p-3 rounded-xl cursor-pointer transition-colors ${formData.company_admin_id === admin._id
+                                    ? "bg-[#fff8f5] text-[#ff782d]"
+                                    : "hover:bg-[#f3f4f6] text-[#081422]"
+                                    }`}
+                                >
+                                  <span className="font-medium">
+                                    {admin.firstName} {admin.lastName}
+                                  </span>
+                                  <span className="text-sm text-[#6b7280]">
+                                    {admin.email}
+                                  </span>
+                                  <span className="text-xs text-[#9ca3af]">
+                                    {admin.phone}
+                                  </span>
+                                </div>
+                              ))
+                            ) : (
+                              <div className="p-4 text-center text-[#6b7280]">
+                                No admins found
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      {errors.company_admin_id && (
+                        <p className="text-red-500 text-sm mt-1">
+                          {errors.company_admin_id}
+                        </p>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {/* Step 4: Categories */}
+                {currentStep === 4 && (
                   <>
                     <div>
                       <label className="block text-sm font-semibold text-[#081422] mb-2">
@@ -505,18 +661,16 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
                                   ]);
                                 }
                               }}
-                              className={`p-4 rounded-xl border-2 cursor-pointer transition-all flex items-center justify-between ${
-                                isSelected
-                                  ? "border-[#ff782d] bg-[#fff8f5]"
-                                  : "border-[#d1d5db] hover:border-[#ff782d]"
-                              }`}
+                              className={`p-4 rounded-xl border-2 cursor-pointer transition-all flex items-center justify-between ${isSelected
+                                ? "border-[#ff782d] bg-[#fff8f5]"
+                                : "border-[#d1d5db] hover:border-[#ff782d]"
+                                }`}
                             >
                               <span
-                                className={`font-medium ${
-                                  isSelected
-                                    ? "text-[#ff782d]"
-                                    : "text-[#081422]"
-                                }`}
+                                className={`font-medium ${isSelected
+                                  ? "text-[#ff782d]"
+                                  : "text-[#081422]"
+                                  }`}
                               >
                                 {cat.name}
                               </span>
@@ -570,41 +724,155 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
                   </>
                 )}
 
-                {/* Step 4: Plan Selection */}
-                {currentStep === 4 && (
+                {/* Step 5: Plan Selection */}
+                {currentStep === 5 && (
                   <>
-                    <label className="block text-sm font-semibold text-[#081422] mb-4">
-                      Select a Plan
-                    </label>
-                    <div className="space-y-3">
-                      {["basic", "pro", "mid"].map((tierOption) => (
-                        <label
-                          key={tierOption}
-                          className={`flex items-center p-4 rounded-2xl border-2 cursor-pointer transition-all ${
-                            formData.tier === tierOption
+                    <div>
+                      <label className="block text-sm font-semibold text-[#081422] mb-4">
+                        Select a Plan
+                      </label>
+                      <div className="space-y-3">
+                        {["basic", "pro", "mid"].map((tierOption) => (
+                          <label
+                            key={tierOption}
+                            className={`flex items-center p-4 rounded-2xl border-2 cursor-pointer transition-all ${formData.tier === tierOption
                               ? "border-[#ff782d] bg-[#fff8f5]"
                               : "border-[#d1d5db] hover:border-[#ff782d]"
-                          }`}
+                              }`}
+                          >
+                            <input
+                              type="radio"
+                              name="tier"
+                              value={tierOption}
+                              checked={formData.tier === tierOption}
+                              onChange={(e) =>
+                                handleInputChange("tier", e.target.value)
+                              }
+                              className="w-4 h-4 accent-[#ff782d]"
+                            />
+                            <span className="ml-3 font-semibold text-[#081422] capitalize">
+                              {tierOption} Plan
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                      {errors.tier && (
+                        <p className="text-red-500 text-sm mt-1">{errors.tier}</p>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
+                      <div>
+                        <label className="block text-sm font-semibold text-[#081422] mb-2">
+                          Industry
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.industry}
+                          onChange={(e) =>
+                            handleInputChange("industry", e.target.value)
+                          }
+                          placeholder="e.g., Technology"
+                          className={`w-full px-4 py-3 rounded-2xl border-2 outline-none transition-all focus:border-[#ff782d] ${errors.industry
+                            ? "border-red-500"
+                            : "border-[#d1d5db] hover:border-[#ff782d]"
+                            } bg-white text-[#081422] placeholder-[#6b7280]`}
+                        />
+                        {errors.industry && (
+                          <p className="text-red-500 text-sm mt-1">
+                            {errors.industry}
+                          </p>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-semibold text-[#081422] mb-2">
+                          Company Size
+                        </label>
+                        <select
+                          value={formData.size}
+                          onChange={(e) =>
+                            handleInputChange("size", e.target.value)
+                          }
+                          className="w-full px-4 py-3 rounded-2xl border-2 border-[#d1d5db] bg-white text-[#081422] outline-none focus:border-[#ff782d]"
                         >
+                          <option value="">Select company size</option>
+                          <option value="1-10">1-10 employees</option>
+                          <option value="11-50">11-50 employees</option>
+                          <option value="51-100">51-100 employees</option>
+                          <option value="100-500">100-500 employees</option>
+                          <option value="500+">500+ employees</option>
+                        </select>
+                        {errors.size && (
+                          <p className="text-red-500 text-sm mt-1">
+                            {errors.size}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* Step 6: Notifications */}
+                {currentStep === 6 && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-semibold text-[#081422] mb-4">
+                        Notification Preferences
+                      </label>
+                      <div className="border-2 border-[#d1d5db] rounded-2xl p-4 space-y-3">
+                        <label className="flex items-center gap-3 cursor-pointer">
                           <input
-                            type="radio"
-                            name="tier"
-                            value={tierOption}
-                            checked={formData.tier === tierOption}
+                            type="checkbox"
+                            checked={formData.notificationsEmail}
                             onChange={(e) =>
-                              handleInputChange("tier", e.target.value)
+                              handleInputChange(
+                                "notificationsEmail",
+                                e.target.checked
+                              )
                             }
                             className="w-4 h-4 accent-[#ff782d]"
                           />
-                          <span className="ml-3 font-semibold text-[#081422] capitalize">
-                            {tierOption} Plan
+                          <span className="text-sm text-[#081422]">
+                            Email Notifications
                           </span>
                         </label>
-                      ))}
+
+                        <label className="flex items-center gap-3 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={formData.notificationsSms}
+                            onChange={(e) =>
+                              handleInputChange(
+                                "notificationsSms",
+                                e.target.checked
+                              )
+                            }
+                            className="w-4 h-4 accent-[#ff782d]"
+                          />
+                          <span className="text-sm text-[#081422]">
+                            SMS Notifications
+                          </span>
+                        </label>
+
+                        <label className="flex items-center gap-3 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={formData.notificationsInApp}
+                            onChange={(e) =>
+                              handleInputChange(
+                                "notificationsInApp",
+                                e.target.checked
+                              )
+                            }
+                            className="w-4 h-4 accent-[#ff782d]"
+                          />
+                          <span className="text-sm text-[#081422]">
+                            In-App Notifications
+                          </span>
+                        </label>
+                      </div>
                     </div>
-                    {errors.tier && (
-                      <p className="text-red-500 text-sm mt-1">{errors.tier}</p>
-                    )}
                   </>
                 )}
               </div>
@@ -615,11 +883,10 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
                   type="button"
                   onClick={handlePrev}
                   disabled={currentStep === 1}
-                  className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-semibold transition-all ${
-                    currentStep === 1
-                      ? "bg-[#f3f4f6] text-[#d1d5db] cursor-not-allowed"
-                      : "border-2 border-[#d1d5db] text-[#081422] hover:border-[#ff782d] hover:text-[#ff782d]"
-                  }`}
+                  className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-semibold transition-all ${currentStep === 1
+                    ? "bg-[#f3f4f6] text-[#d1d5db] cursor-not-allowed"
+                    : "border-2 border-[#d1d5db] text-[#081422] hover:border-[#ff782d] hover:text-[#ff782d]"
+                    }`}
                 >
                   <ChevronLeft size={20} />
                   Previous
@@ -664,13 +931,12 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
                   <div key={step.id} className="flex items-start gap-4">
                     {/* Circle indicator */}
                     <div
-                      className={`w-14 h-14 rounded-full flex items-center justify-center font-semibold transition-all flex-shrink-0 ${
-                        step.id < currentStep
-                          ? "bg-[#ff782d] text-white"
-                          : step.id === currentStep
+                      className={`w-14 h-14 rounded-full flex items-center justify-center font-semibold transition-all flex-shrink-0 ${step.id < currentStep
+                        ? "bg-[#ff782d] text-white"
+                        : step.id === currentStep
                           ? "bg-[#ff782d] text-white border-4 border-[#fff8f5] ring-2 ring-[#ff782d]"
                           : "border-2 border-[#d1d5db] text-[#6b7280] bg-white"
-                      }`}
+                        }`}
                     >
                       {step.id < currentStep ? <Check size={24} /> : step.id}
                     </div>
@@ -678,11 +944,10 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
                     {/* Step title */}
                     <div className="pt-2">
                       <p
-                        className={`font-semibold text-sm transition-colors ${
-                          step.id <= currentStep
-                            ? "text-[#081422]"
-                            : "text-[#6b7280]"
-                        }`}
+                        className={`font-semibold text-sm transition-colors ${step.id <= currentStep
+                          ? "text-[#081422]"
+                          : "text-[#6b7280]"
+                          }`}
                       >
                         {step.title}
                       </p>
