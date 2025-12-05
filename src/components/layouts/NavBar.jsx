@@ -19,6 +19,7 @@ export default function TopNavBar({ expanded = true }) {
   const dispatch = useDispatch();
   const { showNotification } = useNotification();
   const { showLoader, hideLoader } = useLoading();
+  const queryClient = useQueryClient();
 
   // Get user from Redux
   const { user, isInitialized, status } = useSelector((state) => state.auth);
@@ -57,9 +58,21 @@ export default function TopNavBar({ expanded = true }) {
 
   // Profile update is handled in ProfileSidebar component
 
-  const handleLogout = () => {
-    dispatch(logout());
-    router.push("/auth/login");
+  const handleLogout = async () => {
+    try {
+      showLoader();
+      await dispatch(performLogout());
+      // clear all client caches so logged-out users don't see stale data
+      try {
+        queryClient.clear();
+      } catch (e) {}
+      router.push("/auth/login");
+    } catch (err) {
+      console.error("Logout failed:", err);
+      router.push("/auth/login");
+    } finally {
+      hideLoader();
+    }
   };
 
   const handleMarkRead = (id) => {

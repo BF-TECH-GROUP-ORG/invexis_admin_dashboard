@@ -144,14 +144,22 @@ export default function UsersListTable() {
       old ? old.map((u) => (u.id === id || u._id === id ? { ...u, active: !currentStatus } : u)) : []
     );
     
-    // TODO: Implement API call to toggle status if endpoint exists
-    // await UserService.update(id, { active: !currentStatus });
+    try {
+      await UserService.update(id, { active: !currentStatus });
+      showNotification({ message: "User status updated", severity: "success" });
+      queryClient.invalidateQueries({ queryKey: ["users_list"] });
+    } catch (err) {
+      console.error("Failed to update status", err);
+      showNotification({ message: "Failed to update status", severity: "error" });
+      // Revert optimistic update
+      queryClient.invalidateQueries({ queryKey: ["users_list"] });
+    }
     
     setOpenMenu(null);
   };
 
   const handleEditUser = (id) => {
-    router.push(`/users/edit/${id}`); // Assuming edit page exists or will exist
+    router.push(`/users/edit/${id}`);
     setOpenMenu(null);
   };
 
@@ -164,6 +172,7 @@ export default function UsersListTable() {
           old ? old.filter((u) => (u.id || u._id) !== id) : []
         );
         showNotification({ message: "User deleted", severity: "success" });
+        queryClient.invalidateQueries({ queryKey: ["users_list"] });
       } catch (err) {
         showNotification({ message: "Failed to delete user", severity: "error" });
       } finally {

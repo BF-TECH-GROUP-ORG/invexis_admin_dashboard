@@ -16,6 +16,8 @@ export const metadata = {
 
 import QueryProvider from "@/providers/QueryProvider";
 
+import AuthProvider from "@/providers/AuthProvider";
+
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
@@ -25,7 +27,9 @@ export default function RootLayout({ children }) {
             <ThemeRegistry>
               <LoadingProvider>
                 <NotificationProvider>
-                  <ProtectedRoute>{children}</ProtectedRoute>
+                  <AuthProvider>
+                    <ProtectedRoute>{children}</ProtectedRoute>
+                  </AuthProvider>
                 </NotificationProvider>
               </LoadingProvider>
             </ThemeRegistry>

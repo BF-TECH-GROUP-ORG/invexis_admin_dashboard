@@ -19,7 +19,11 @@ import {
   LogOut,
 } from "lucide-react";
 
-import {logout} from "@/services/AuthService"
+// NOTE: use performLogout via redux so client caches and local storage are cleared
+import { useDispatch } from "react-redux";
+import { useRouter } from "next/navigation";
+import { performLogout } from "@/features/AuthSlice";
+import { useQueryClient } from "@tanstack/react-query";
 
 const navItems = [
   {
@@ -60,12 +64,23 @@ const navItems = [
     icon: <FileSpreadsheet size={22} />,
     path: "/reports",
   },
+  {
+    title: "Roles",
+    icon: <ShieldCheck size={22} />,
+    children: [
+      { title: "All Roles", path: "/roles/list" },
+      { title: "Company Admins", path: "/roles/company-admins" },
+    ],
+  },
 ];
 
 export default function SideBar({
   expanded: controlledExpanded,
   setExpanded: setControlledExpanded,
 }) {
+  const dispatch = useDispatch();
+  const router = useRouter();
+  const qc = useQueryClient();
   const isControlled =
     typeof controlledExpanded === "boolean" &&
     typeof setControlledExpanded === "function";
@@ -223,7 +238,18 @@ export default function SideBar({
           <button
             className="w-full flex items-center justify-center gap-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors duration-200"
             title={expanded ? "Logout" : "Logout"}
-            onClick={logout}
+            onClick={async () => {
+              try {
+                await dispatch(performLogout());
+                try {
+                  qc.clear();
+                } catch (e) {}
+                router.push("/auth/login");
+              } catch (err) {
+                console.error("Logout from sidebar failed", err);
+                window.location.href = "/auth/login";
+              }
+            }}
           >
             <LogOut size={22} />
             {expanded && <span className="font-medium">Logout</span>}

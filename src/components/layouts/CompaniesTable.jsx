@@ -65,17 +65,20 @@ export default function CompaniesTable() {
     data: companies = [],
     isLoading: loading,
     error,
-  } = useHybridQuery("companies_list", async () => {
-    const params = {};
-    if (tierFilter) params.tier = tierFilter;
-    if (statusFilter) params.status = statusFilter;
-    if (countryFilter) params.country = countryFilter;
-    params.limit = rowsPerPage || 50;
-    params.offset = page * (rowsPerPage || 50);
+  } = useHybridQuery(
+    ["companies_list", { tier: tierFilter, status: statusFilter, country: countryFilter, page, limit: rowsPerPage }],
+    async () => {
+      const params = {};
+      if (tierFilter) params.tier = tierFilter;
+      if (statusFilter) params.status = statusFilter;
+      if (countryFilter) params.country = countryFilter;
+      params.limit = rowsPerPage || 50;
+      params.offset = page * (rowsPerPage || 50);
 
-    const data = await CompanyService.getAll(params);
-    return data?.data || data || [];
-  });
+      const data = await CompanyService.getAll(params);
+      return data?.data || data || [];
+    }
+  );
   const [selected, setSelected] = useState([]);
   const [dense, setDense] = useState(false);
   const dispatch = useDispatch();

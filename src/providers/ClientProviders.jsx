@@ -9,7 +9,7 @@ import AuthProvider from "./AuthProvider";
 const ClientProviders = ({ children }) => {
   return (
     <Provider store={store}>
-      <AuthProvider>{children}</AuthProvider>
+      {children}
     </Provider>
   );
 };

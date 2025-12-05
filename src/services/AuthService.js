@@ -1,38 +1,92 @@
 import api from "@/lib/axios";
 
+/**
+ * Login with email/phone/username and password
+ * Returns: { ok: true, accessToken, user: {...} }
+ */
 export const login = (credentials) => {
-  console.log("Login request payload:", credentials);
-  return api.post("/auth/login", credentials, {
-    headers: { "Content-Type": "application/json" },
+  if (!credentials.identifier || !credentials.password) {
+    console.error("[AuthService] Missing credentials", {
+      hasIdentifier: !!credentials.identifier,
+      hasPassword: !!credentials.password,
+    });
+    throw new Error("Identifier and password are required");
+  }
+
+  const payload = {
+    identifier: credentials.identifier,
+    password: credentials.password,
+  };
+
+  console.log("[AuthService] Sending login request to /auth/login", {
+    identifier: credentials.identifier,
+    hasPassword: !!credentials.password,
+    payload,
+    url: "/auth/login",
+  });
+
+  return api.post("/auth/login", payload).catch((err) => {
+    console.error("[AuthService] Login API error:", {
+      status: err.response?.status,
+      statusText: err.response?.statusText,
+      message: err.message,
+      data: err.response?.data,
+    });
+    throw err;
   });
 };
 
+/**
+ * Register a new super admin
+ */
 export const registerSuperAdmin = (payload) =>
   api.post("/auth/register", payload);
 
-export const refreshToken = (token) =>
-  api.get("/auth/refresh", { refreshToken: token });
+/**
+ * Refresh access token using httpOnly refresh token cookie
+ * Returns: { ok: true, accessToken }
+ */
+export const refreshToken = () => api.post("/auth/refresh");
 
+/**
+ * Logout user and invalidate session on backend
+ * Requires valid authorization header (access token)
+ */
 export const logout = async () => {
   try {
-    const token = localStorage.getItem("invexis_token");
-    // Send logout request to backend with token so server can invalidate session
-    const response = await api.post(
-      "/auth/logout",
-      {},
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    );
+    // Send logout request to backend so server can invalidate session/cookie
+    const response = await api.post("/auth/logout");
     return response.data;
   } catch (err) {
-    // Even if backend fails, we should still clear client-side state
     console.error(
       "Logout API error (will still clear local state):",
       err.message
     );
-    throw err;
+    // Don't throw - we want to clear local state even if logout fails
+    return { ok: true };
   }
 };
+
+/**
+ * Get current user profile (requires valid access token)
+ * Returns: { ok: true, user: {...} }
+ */
+export const getMe = () => api.get("/auth/me");
+
+/**
+ * Change password (requires valid access token and 2FA if enabled)
+ */
+export const changePassword = (payload) =>
+  api.post("/auth/me/password/change", payload);
+
+/**
+ * Request OTP for passwordless login
+ */
+export const requestOtpLogin = (identifier) =>
+  api.post("/auth/login/otp", { identifier });
+
+/**
+ * Verify OTP for passwordless login
+ */
+export const verifyOtpLogin = (payload) =>
+  api.post("/auth/login/otp/verify", payload);

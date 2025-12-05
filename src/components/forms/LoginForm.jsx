@@ -6,9 +6,7 @@ import { useDispatch } from "react-redux";
 import { IconButton, InputAdornment } from "@mui/material";
 import { HiEye, HiEyeOff } from "react-icons/hi";
 import FormWrapper from "../shared/FormWrapper";
-import { login } from "@/services/AuthService";
-import { setToken, setUser, setRefreshToken } from "@/lib/authUtils";
-import { setAuthData } from "@/features/AuthSlice";
+import { login } from "@/features/AuthSlice";
 
 export default function LoginForm() {
   const [formData, setFormData] = useState({
@@ -28,38 +26,73 @@ export default function LoginForm() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+
+    // Validate form before submitting
+    if (!formData.identifier.trim()) {
+      setError("Please enter your email, phone, or username");
+      return;
+    }
+
+    if (!formData.password) {
+      setError("Please enter your password");
+      return;
+    }
+
     setSubmitting(true);
 
     try {
-      console.log("Submitting Login Form Data:", formData);
-      const { data } = await login(formData);
+      console.log("[LoginForm] Submitting login form with data:", {
+        identifier: formData.identifier,
+        password: formData.password,
+        hasIdentifier: !!formData.identifier,
+        hasPassword: !!formData.password,
+      });
 
-      // Support different API shapes (accessToken or token)
-      const token = data.accessToken ?? data.token ?? null;
-      const refresh = data.refreshToken ?? data.refresh_token ?? null;
+      // Dispatch login thunk - it handles everything:
+      // - API call to /auth/login
+      // - Token storage in memory via authUtils.setToken()
+      // - Redux state update with token and user
+      const result = await dispatch(login(formData));
 
-      // Store auth data safely
-      if (token) setToken(token);
-      if (refresh) setRefreshToken(refresh);
-      if (data.user) setUser(data.user);
+      console.log("[LoginForm] Login thunk result:", {
+        type: result.type,
+        fulfilled: login.fulfilled.match(result),
+        rejected: login.rejected.match(result),
+      });
 
-      // Update Redux state (include the token fallback)
-      dispatch(
-        setAuthData({
-          token: token,
-          refreshToken: refresh,
-          user: data.user ?? null,
-        })
-      );
-
-      // Redirect to dashboard
-      router.replace("/");
+      if (login.fulfilled.match(result)) {
+        // Login successful, redirect to dashboard
+        console.log("[LoginForm] Login successful, redirecting to dashboard", {
+          hasUser: !!result.payload.user,
+          userId: result.payload.user?._id,
+          userName: result.payload.user?.firstName,
+          hasToken: !!result.payload.token,
+        });
+        setError(""); // Clear any errors
+        router.replace("/");
+      } else if (login.rejected.match(result)) {
+        // Login failed - show error from thunk
+        const errorMessage =
+          result.payload?.message || "Login failed. Please try again.";
+        setError(errorMessage);
+        console.error("[LoginForm] Login rejected:", {
+          error: result.payload,
+          message: errorMessage,
+        });
+      } else {
+        // Unexpected state
+        console.error("[LoginForm] Unexpected login result:", result);
+        setError("An unexpected error occurred. Please try again.");
+      }
     } catch (err) {
-      console.error("Login error details:", err);
-      console.error("Response data:", err.response?.data);
-      console.error("Response status:", err.response?.status);
+      console.error("[LoginForm] Unexpected error during login:", {
+        message: err.message,
+        stack: err.stack,
+        response: err.response?.data,
+      });
       setError(
-        err.response?.data?.message || "Login failed. Please try again."
+        err.response?.data?.message ||
+          "An unexpected error occurred. Please try again."
       );
     } finally {
       setSubmitting(false);

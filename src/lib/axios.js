@@ -1,14 +1,13 @@
 import axios from "axios";
-import { getToken, removeToken, getRefreshToken, setToken } from "./authUtils";
-import { refreshToken } from "@/services/AuthService";
+import { getToken, removeToken, setToken } from "./authUtils";
+import { refreshToken as apiRefreshToken } from "@/services/AuthService";
 
 // Use NEXT_PUBLIC_API_BASE_URL when available, otherwise use local proxy
-const DEFAULT_BASE = "/api";
-// const baseURL = (process.env.NEXT_PUBLIC_API_BASE_URL || DEFAULT_BASE).replace(
-//   /\/$/,
-//   ""
-// );
-const baseURL = DEFAULT_BASE;
+const DEFAULT_BASE = "https://granitic-jule-haunting.ngrok-free.dev/api";
+const baseURL = (process.env.NEXT_PUBLIC_API_BASE_URL || DEFAULT_BASE).replace(
+  /\/$/,
+  ""
+);
 
 const api = axios.create({
   baseURL,
@@ -16,15 +15,17 @@ const api = axios.create({
     "Content-Type": "application/json",
     "ngrok-skip-browser-warning": "true",
   },
-  withCredentials: true, // Enable credentials to send/receive cookies (CSRF tokens)
+  withCredentials: true, // Enable credentials to send/receive cookies (refresh token, CSRF tokens)
 });
 
-// Helper function to get CSRF token from cookie
+/**
+ * Helper function to get CSRF token from cookie
+ */
 const getCsrfToken = () => {
-  if (typeof document === 'undefined') return null;
-  const name = '_csrf=';
+  if (typeof document === "undefined") return null;
+  const name = "_csrf=";
   const decodedCookie = decodeURIComponent(document.cookie);
-  const cookieArray = decodedCookie.split(';');
+  const cookieArray = decodedCookie.split(";");
   for (let i = 0; i < cookieArray.length; i++) {
     let cookie = cookieArray[i].trim();
     if (cookie.indexOf(name) === 0) {
@@ -34,94 +35,143 @@ const getCsrfToken = () => {
   return null;
 };
 
-// Attach token and CSRF token to every request
-api.interceptors.request.use((config) => {
-  if (typeof window !== "undefined") {
-    // Add authentication token
-    const token = getToken();
-    if (token) {
+/**
+ * Request interceptor
+ * Attaches access token (Bearer) and CSRF token to each request
+ */
+api.interceptors.request.use(
+  (config) => {
+    console.log(`[Axios] ${config.method?.toUpperCase()} ${config.url}`);
+
+    if (typeof window !== "undefined") {
+      // Ensure headers object exists
       config.headers = config.headers || {};
-      config.headers.Authorization = `Bearer ${token}`;
-    }
 
-    // Add CSRF token for non-GET requests (POST, PUT, DELETE, PATCH)
-    const csrfToken = getCsrfToken();
-    if (csrfToken && config.method && !['get', 'head', 'options'].includes(config.method.toLowerCase())) {
-      config.headers['X-CSRF-Token'] = csrfToken;
-      config.headers['CSRF-Token'] = csrfToken; // Some backends expect this header name
+      // Add access token from memory
+      const token = getToken();
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+        console.debug("[Axios] Authorization header set");
+      }
+
+      // Add CSRF token for non-safe requests (POST, PUT, DELETE, PATCH)
+      const csrfToken = getCsrfToken();
+      if (
+        csrfToken &&
+        config.method &&
+        !["get", "head", "options"].includes(config.method.toLowerCase())
+      ) {
+        config.headers["X-CSRF-Token"] = csrfToken;
+      }
     }
+    return config;
+  },
+  (error) => {
+    console.error("[Axios Request Error]", error);
+    return Promise.reject(error);
   }
-  return config;
-});
+);
 
-// Response interceptor to handle 401 and token refresh
+/**
+ * Response interceptor
+ * Handles 401 Unauthorized by attempting to refresh token using httpOnly cookie
+ * If refresh succeeds, retries the original request with new token
+ * If refresh fails, clears auth state and redirects to login
+ */
 let isRefreshing = false;
-let failedQueue = [];
+let refreshSubscribers = [];
 
-const processQueue = (error, token = null) => {
-  failedQueue.forEach((prom) => {
-    if (error) {
-      prom.reject(error);
-    } else {
-      prom.resolve(token);
-    }
-  });
-  failedQueue = [];
+const onRefreshed = (token) => {
+  refreshSubscribers.forEach((callback) => callback(token));
+  refreshSubscribers = [];
+};
+
+const addRefreshSubscriber = (callback) => {
+  refreshSubscribers.push(callback);
 };
 
 api.interceptors.response.use(
   (res) => res,
   async (err) => {
     const originalRequest = err.config;
+    const errorCode = err.code;
+    const statusCode = err.response?.status;
 
-    // If 401 and not already retrying
-    if (err.response?.status === 401 && !originalRequest._retry) {
+    // Log network errors
+    if (errorCode === "ERR_NETWORK" || !err.response) {
+      console.error("[Axios Network Error]", {
+        code: errorCode,
+        message: err.message,
+        url: originalRequest?.url,
+        baseURL: originalRequest?.baseURL,
+        details:
+          "Backend server is not responding. Check if the API server is running and ngrok tunnel is active.",
+      });
+      return Promise.reject(err);
+    }
+
+    // Handle 401 Unauthorized - try to refresh token
+    if (statusCode === 401 && !originalRequest._retry) {
       if (typeof window === "undefined") {
+        // Running on server - can't refresh
         return Promise.reject(err);
-      }
-
-      if (isRefreshing) {
-        return new Promise(function (resolve, reject) {
-          failedQueue.push({ resolve, reject });
-        })
-          .then((token) => {
-            originalRequest.headers["Authorization"] = "Bearer " + token;
-            return api(originalRequest);
-          })
-          .catch((err) => {
-            return Promise.reject(err);
-          });
       }
 
       originalRequest._retry = true;
-      isRefreshing = true;
 
-      const rToken = getRefreshToken();
-
-      if (!rToken) {
-        // No refresh token, logout
-        removeToken();
-        window.location.href = "/auth/login";
-        return Promise.reject(err);
+      // If already refreshing, queue this request
+      if (isRefreshing) {
+        return new Promise(function (resolve, reject) {
+          addRefreshSubscriber((token) => {
+            originalRequest.headers["Authorization"] = "Bearer " + token;
+            resolve(api(originalRequest));
+          });
+        }).catch((err) => {
+          // Refresh failed, reject this request
+          return Promise.reject(err);
+        });
       }
 
+      // Start refresh process
+      isRefreshing = true;
+
       try {
-        const { data } = await refreshToken(rToken);
-        const newToken = data.accessToken || data.token;
-        
+        console.log("[Axios] Attempting token refresh...");
+        // Call refresh endpoint (uses httpOnly cookie)
+        const { data } = await apiRefreshToken();
+        const newToken = data.accessToken;
+
+        if (!newToken) {
+          throw new Error("No access token returned from refresh");
+        }
+
+        // Store new token in memory
         setToken(newToken);
         api.defaults.headers.common["Authorization"] = "Bearer " + newToken;
-        originalRequest.headers["Authorization"] = "Bearer " + newToken;
-        
-        processQueue(null, newToken);
+
+        console.log("[Axios] Token refreshed successfully");
+
+        // Notify all queued requests
+        onRefreshed(newToken);
         isRefreshing = false;
-        
+
+        // Retry original request with new token
+        originalRequest.headers["Authorization"] = "Bearer " + newToken;
         return api(originalRequest);
       } catch (refreshErr) {
-        processQueue(refreshErr, null);
+        console.error("[Axios] Token refresh failed", refreshErr.message);
+
+        // Notify all queued requests of failure
+        onRefreshed(null);
         isRefreshing = false;
+
+        // Clear token and redirect to login
         removeToken();
-        window.location.href = "/auth/login";
+
+        if (typeof window !== "undefined") {
+          window.location.href = "/auth/login";
+        }
+
         return Promise.reject(refreshErr);
       }
     }

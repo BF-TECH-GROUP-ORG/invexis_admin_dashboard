@@ -6,9 +6,11 @@ import CompanyService from "../../services/CompanyService";
 import { useLoading } from "../../providers/LoadingProvider";
 import { useRouter } from "next/navigation";
 import { ChevronRight, ChevronLeft, Check } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 
 const AddNewCategoryForm = ({ initialData = null, onSuccess = null }) => {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [currentStep, setCurrentStep] = useState(1);
   const { showNotification } = useNotification();
   const loadingHelpers = useLoading();
@@ -240,6 +242,9 @@ const AddNewCategoryForm = ({ initialData = null, onSuccess = null }) => {
               "categories_cache_v1::" + JSON.stringify({ page: 1, limit: 200 })
             );
           } catch (e) {}
+          
+          queryClient.invalidateQueries({ queryKey: ["categories_list"] });
+
           if (onSuccess) onSuccess(res.data || res);
           router.push("/categories/list");
         } else {

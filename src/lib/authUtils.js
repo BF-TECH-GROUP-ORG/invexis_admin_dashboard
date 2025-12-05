@@ -1,50 +1,92 @@
-export const TOKEN_KEY = "invexis_token";
-export const REFRESH_TOKEN_KEY = "invexis_refresh_token";
-export const USER_KEY = "invexis_user";
+/**
+ * In-memory token storage
+ * Access token is stored ONLY in memory, not in localStorage or cookies
+ * This is secure because:
+ * 1. Tokens can't be accessed by XSS attacks through localStorage
+ * 2. Refresh token is stored in httpOnly cookies (server-side, automatic)
+ * 3. On page refresh, app restores session via refresh token cookie
+ *
+ * Token persists for the duration of the browser session, cleared on:
+ * - Window/tab close
+ * - Explicit logout
+ * - App navigation/refresh (but restoreSession thunk handles this)
+ */
+let accessToken = null;
 
+/**
+ * Store access token in memory
+ * Called by:
+ * - AuthSlice.login fulfilled handler
+ * - AuthSlice.restoreSession fulfilled handler
+ * - Axios response interceptor after token refresh
+ */
 export function setToken(token) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(TOKEN_KEY, token);
+  accessToken = token;
+  console.debug("[authUtils] Token set in memory");
 }
 
+/**
+ * Retrieve access token from memory
+ * Called by:
+ * - Axios request interceptor to add Authorization header
+ * - AuthSlice thunks to check if authenticated
+ */
 export function getToken() {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem(TOKEN_KEY);
+  return accessToken;
 }
 
-export function setRefreshToken(token) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(REFRESH_TOKEN_KEY, token);
-}
-
-export function getRefreshToken() {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem(REFRESH_TOKEN_KEY);
-}
-
+/**
+ * Clear access token from memory
+ * Called by:
+ * - AuthSlice logout handlers
+ * - Axios response interceptor on 401 (failed refresh)
+ */
 export function removeToken() {
-  if (typeof window === "undefined") return;
-  localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(REFRESH_TOKEN_KEY);
-  localStorage.removeItem(USER_KEY);
-}
+  accessToken = null;
+  console.debug("[authUtils] Token removed from memory");
 
-export function setUser(user) {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(USER_KEY, JSON.stringify(user));
-  } catch {}
-}
-
-export function getUser() {
-  if (typeof window === "undefined") return null;
-  try {
-    return JSON.parse(localStorage.getItem(USER_KEY));
-  } catch {
-    return null;
+  // Clear any legacy localStorage items from previous implementation
+  if (typeof window !== "undefined") {
+    localStorage.removeItem("invexis_token");
+    localStorage.removeItem("invexis_refresh_token");
+    localStorage.removeItem("invexis_user");
   }
 }
 
+/**
+ * Check if user is currently authenticated
+ * True if access token exists in memory
+ */
 export function isAuthenticated() {
-  return !!getToken();
+  return !!accessToken;
+}
+
+/**
+ * Legacy - Refresh token is managed by httpOnly cookie, not stored in memory
+ * No-op functions kept for backwards compatibility
+ */
+export function setRefreshToken(token) {
+  // No-op: Refresh token is in httpOnly cookie, managed by backend
+  console.debug(
+    "[authUtils] setRefreshToken - no-op (httpOnly cookie handled by backend)"
+  );
+}
+
+export function getRefreshToken() {
+  // No-op: Refresh token is in httpOnly cookie, not accessible from JS
+  return null;
+}
+
+/**
+ * Legacy - User state is managed by Redux, not authUtils
+ * No-op function kept for backwards compatibility
+ */
+export function setUser(user) {
+  // No-op: User state is managed by Redux store
+  console.debug("[authUtils] setUser - no-op (user state in Redux)");
+}
+
+export function getUser() {
+  // No-op: User state is managed by Redux store
+  return null;
 }

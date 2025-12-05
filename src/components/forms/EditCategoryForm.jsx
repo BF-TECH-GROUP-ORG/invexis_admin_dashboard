@@ -12,10 +12,13 @@ import {
   Check,
   Upload,
   Image as ImageIcon,
+  Image as ImageIcon,
 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 
 const EditCategoryForm = ({ initialData }) => {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [currentStep, setCurrentStep] = useState(1);
   const { showNotification } = useNotification();
   const loadingHelpers = useLoading();
@@ -198,6 +201,8 @@ const EditCategoryForm = ({ initialData }) => {
       try {
         localStorage.removeItem("categories_cache_v1");
       } catch (e) {}
+
+      queryClient.invalidateQueries({ queryKey: ["categories_list"] });
 
       showNotification({
         message: "Category updated successfully",

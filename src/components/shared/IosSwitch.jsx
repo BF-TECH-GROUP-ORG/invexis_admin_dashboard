@@ -1,9 +1,24 @@
 import { styled } from "@mui/material/styles";
 import Switch from "@mui/material/Switch";
 
-const IOSSwitch = styled((props) => (
-  <Switch focusVisibleClassName=".Mui-focusVisible" disableRipple {...props} />
-))(({ theme }) => ({
+const IOSSwitch = styled((props) => {
+  // Ensure Switch receives a controlled boolean `checked` prop to avoid
+  // React warnings where it flips uncontrolled -> controlled when a value
+  // arrives later. If the caller only passes defaultChecked (uncontrolled
+  // intent) we respect that; otherwise normalize undefined -> false.
+  const isChecked =
+    typeof props.checked === "undefined"
+      ? props.defaultChecked ?? false
+      : props.checked;
+  return (
+    <Switch
+      focusVisibleClassName=".Mui-focusVisible"
+      disableRipple
+      {...props}
+      checked={isChecked}
+    />
+  );
+})(({ theme }) => ({
   width: 42,
   height: 27,
   padding: 0,
