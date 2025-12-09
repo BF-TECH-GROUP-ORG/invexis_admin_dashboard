@@ -1,0 +1,97 @@
+"use server";
+
+import { signIn } from "@/auth";
+import { AuthError } from "next-auth";
+import axios from "axios";
+import { cookies } from "next/headers";
+
+export async function loginAction(prevState, formData) {
+  const identifier = formData.get("identifier");
+  const password = formData.get("password");
+
+  if (!identifier || !password) {
+    return "Missing credentials";
+  }
+
+  try {
+    const response = await axios.post(
+      `${process.env.NEXT_PUBLIC_API_URL}/auth/login`,
+      {
+        identifier,
+        password,
+      }
+    );
+
+    const data = response.data;
+    if (!data.ok) {
+      return "Login failed";
+    }
+
+    // Handle Cookies
+    const setCookieHeaders = response.headers["set-cookie"];
+    let refreshTokenValue = null;
+
+    if (setCookieHeaders) {
+      const cookieStore = await cookies();
+
+      // Parse and set each cookie
+      setCookieHeaders.forEach((cookieString) => {
+        const [nameValue, ...options] = cookieString.split("; ");
+        const [name, value] = nameValue.split("=");
+
+        // Extract refreshToken value before setting cookie
+        if (name === "refreshToken") {
+          refreshTokenValue = value;
+        }
+
+        const cookieOptions = {};
+        options.forEach((opt) => {
+          const [key, val] = opt.split("=");
+          if (key.toLowerCase() === "httponly") cookieOptions.httpOnly = true;
+          if (key.toLowerCase() === "secure") cookieOptions.secure = true;
+          if (key.toLowerCase() === "path") cookieOptions.path = val;
+          if (key.toLowerCase() === "samesite")
+            cookieOptions.sameSite = val.toLowerCase();
+          if (key.toLowerCase() === "max-age")
+            cookieOptions.maxAge = parseInt(val);
+          if (key.toLowerCase() === "expires")
+            cookieOptions.expires = new Date(val);
+        });
+
+        cookieStore.set(name, value, cookieOptions);
+      });
+    }
+
+    // Add refreshToken to data for NextAuth JWT storage
+    const userDataWithRefreshToken = {
+      ...data,
+      refreshToken: refreshTokenValue,
+    };
+
+    // Sign in with NextAuth
+    // Pass the user object (including refreshToken) as a JSON string to the credentials provider
+    await signIn("credentials", {
+      user: JSON.stringify(userDataWithRefreshToken),
+      redirect: false,
+    });
+
+    return { success: true };
+  } catch (error) {
+    if (error instanceof AuthError) {
+      switch (error.type) {
+        case "CredentialsSignin":
+          return "Invalid credentials.";
+        default:
+          return "Something went wrong.";
+      }
+    }
+
+    // Check for axios error response
+    if (axios.isAxiosError(error) && error.response) {
+      return error.response.data?.message || "Authentication failed";
+    }
+
+    console.error("Login action error:", error);
+    return "Authentication failed";
+  }
+}

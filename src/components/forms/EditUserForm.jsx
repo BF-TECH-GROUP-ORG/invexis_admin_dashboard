@@ -6,15 +6,15 @@ import { Check, ChevronLeft, ChevronRight, Eye, EyeOff } from "lucide-react";
 import UserService from "@/services/UserService";
 import { useNotification } from "@/providers/NotificationProvider";
 import { useLoading } from "@/providers/LoadingProvider";
-import { useSelector } from "react-redux";
-import { useQueryClient } from "@tanstack/react-query";
+import { useSession } from "next-auth/react";
 
 const EditUserForm = ({ userId }) => {
   const router = useRouter();
   const { showNotification } = useNotification();
   const { showLoader, hideLoader } = useLoading();
-  const queryClient = useQueryClient();
-  const currentUser = useSelector((state) => state.auth?.user);
+
+  const { data: session } = useSession();
+  const currentUser = session?.user;
   const [currentStep, setCurrentStep] = useState(1);
 
   const [formData, setFormData] = useState({
@@ -255,8 +255,6 @@ const EditUserForm = ({ userId }) => {
         message: "User updated successfully",
         severity: "success",
       });
-
-      queryClient.invalidateQueries({ queryKey: ["users_list"] });
 
       router.push("/users/list");
     } catch (err) {

@@ -2,11 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useDispatch } from "react-redux";
 import { IconButton, InputAdornment } from "@mui/material";
 import { HiEye, HiEyeOff } from "react-icons/hi";
 import FormWrapper from "../shared/FormWrapper";
-import { login } from "@/features/AuthSlice";
+import { loginAction } from "@/actions/auth";
 
 export default function LoginForm() {
   const [formData, setFormData] = useState({
@@ -17,7 +16,6 @@ export default function LoginForm() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const router = useRouter();
-  const dispatch = useDispatch();
 
   const handleChange = (field, value) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -41,59 +39,24 @@ export default function LoginForm() {
     setSubmitting(true);
 
     try {
-      console.log("[LoginForm] Submitting login form with data:", {
-        identifier: formData.identifier,
-        password: formData.password,
-        hasIdentifier: !!formData.identifier,
-        hasPassword: !!formData.password,
-      });
+      // Create FormData for server action
+      const formDataObj = new FormData();
+      formDataObj.append("identifier", formData.identifier);
+      formDataObj.append("password", formData.password);
 
-      // Dispatch login thunk - it handles everything:
-      // - API call to /auth/login
-      // - Token storage in memory via authUtils.setToken()
-      // - Redux state update with token and user
-      const result = await dispatch(login(formData));
+      const result = await loginAction(null, formDataObj);
 
-      console.log("[LoginForm] Login thunk result:", {
-        type: result.type,
-        fulfilled: login.fulfilled.match(result),
-        rejected: login.rejected.match(result),
-      });
-
-      if (login.fulfilled.match(result)) {
+      if (result?.success) {
         // Login successful, redirect to dashboard
-        console.log("[LoginForm] Login successful, redirecting to dashboard", {
-          hasUser: !!result.payload.user,
-          userId: result.payload.user?._id,
-          userName: result.payload.user?.firstName,
-          hasToken: !!result.payload.token,
-        });
-        setError(""); // Clear any errors
-        router.replace("/");
-      } else if (login.rejected.match(result)) {
-        // Login failed - show error from thunk
-        const errorMessage =
-          result.payload?.message || "Login failed. Please try again.";
-        setError(errorMessage);
-        console.error("[LoginForm] Login rejected:", {
-          error: result.payload,
-          message: errorMessage,
-        });
+        router.push("/");
+        router.refresh();
       } else {
-        // Unexpected state
-        console.error("[LoginForm] Unexpected login result:", result);
-        setError("An unexpected error occurred. Please try again.");
+        // Login failed - show error
+        setError(result || "Login failed. Please try again.");
       }
     } catch (err) {
-      console.error("[LoginForm] Unexpected error during login:", {
-        message: err.message,
-        stack: err.stack,
-        response: err.response?.data,
-      });
-      setError(
-        err.response?.data?.message ||
-          "An unexpected error occurred. Please try again."
-      );
+      console.error("[LoginForm] Unexpected error during login:", err);
+      setError("An unexpected error occurred. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -132,7 +95,6 @@ export default function LoginForm() {
           },
         },
       ]}
-      oauthOptions={["google"]}
     />
   );
 }

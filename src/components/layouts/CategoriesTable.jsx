@@ -1,8 +1,6 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { useHybridQuery } from "@/hooks/useHybridQuery";
 import { useDispatch, useSelector } from "react-redux";
 import { setTablePagination } from "@/features/SettingsSlice";
 import {
@@ -41,7 +39,6 @@ export default function CategoriesTable({
   filterParent,
   onFilterChange,
 }) {
-  const queryClient = useQueryClient();
   const [categories, setCategories] = useState([]);
   const [totalCount, setTotalCount] = useState(0);
   const [selected, setSelected] = useState([]);
@@ -97,54 +94,47 @@ export default function CategoriesTable({
     return result;
   }, [categories, sort]);
 
-  // Fetch categories from backend using React Query
-  const { data: queryData, isLoading } = useHybridQuery(
-    [
-      "categories_list",
-      {
-        page: page + 1,
-        limit: rowsPerPage,
-        search,
-        level: levelFilter,
-        parent: parentFilter,
-        sort,
-      },
-    ],
-    async () => {
-      const response = await CategoryService.getCategories({
-        page: page + 1,
-        limit: rowsPerPage,
-        search,
-        level: levelFilter,
-        parent: parentFilter,
-        sort,
-      });
-
-      const payload = response?.data ?? response ?? {};
-      const categoriesResult =
-        payload.categories ??
-        payload.data ??
-        (Array.isArray(payload) ? payload : []);
-      const total =
-        payload.totalCount ??
-        payload.total ??
-        (Array.isArray(categoriesResult) ? categoriesResult.length : 0);
-
-      return { categories: categoriesResult, totalCount: total };
-    }
-  );
+  // Fetch categories directly from API
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    if (queryData) {
-      setCategories(queryData.categories);
-      setTotalCount(queryData.totalCount);
-    }
-  }, [queryData]);
+    const fetchCategories = async () => {
+      setIsLoading(true);
+      showLoader();
+      try {
+        const response = await CategoryService.getCategories({
+          page: page + 1,
+          limit: rowsPerPage,
+          search,
+          level: levelFilter,
+          parent: parentFilter,
+          sort,
+        });
 
-  useEffect(() => {
-    if (isLoading) showLoader();
-    else hideLoader();
-  }, [isLoading]);
+        const payload = response?.data ?? response ?? {};
+        const categoriesResult =
+          payload.categories ??
+          payload.data ??
+          (Array.isArray(payload) ? payload : []);
+        const total =
+          payload.totalCount ??
+          payload.total ??
+          (Array.isArray(categoriesResult) ? categoriesResult.length : 0);
+
+        setCategories(categoriesResult);
+        setTotalCount(total);
+      } catch (error) {
+        console.error("Failed to fetch categories:", error);
+        setCategories([]);
+        setTotalCount(0);
+      } finally {
+        setIsLoading(false);
+        hideLoader();
+      }
+    };
+
+    fetchCategories();
+  }, [page, rowsPerPage, search, levelFilter, parentFilter, sort]);
 
   // Sync external filter props
   useEffect(() => {
@@ -192,7 +182,26 @@ export default function CategoriesTable({
     try {
       await CategoryService.deleteCategory(id);
       showNotification("Category deleted successfully!", "success");
-      queryClient.invalidateQueries({ queryKey: ["categories_list"] });
+      // Refetch categories after deletion
+      const response = await CategoryService.getCategories({
+        page: page + 1,
+        limit: rowsPerPage,
+        search,
+        level: levelFilter,
+        parent: parentFilter,
+        sort,
+      });
+      const payload = response?.data ?? response ?? {};
+      const categoriesResult =
+        payload.categories ??
+        payload.data ??
+        (Array.isArray(payload) ? payload : []);
+      const total =
+        payload.totalCount ??
+        payload.total ??
+        (Array.isArray(categoriesResult) ? categoriesResult.length : 0);
+      setCategories(categoriesResult);
+      setTotalCount(total);
     } catch (error) {
       console.error("Failed to delete category:", error);
       showNotification("Failed to delete category.", "error");

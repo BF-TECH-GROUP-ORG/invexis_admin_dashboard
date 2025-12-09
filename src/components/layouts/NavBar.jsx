@@ -6,23 +6,21 @@ import Image from "next/image";
 // framer-motion removed from NavBar (moved into child components as needed)
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useSelector, useDispatch } from "react-redux";
-import { useQueryClient } from "@tanstack/react-query";
+import { useSession, signOut } from "next-auth/react";
 import NotificationSideBar from "./Notifications_Sidebar";
 import ProfileSidebar from "./ProfileSidebar";
-import { performLogout } from "@/features/AuthSlice";
 import { useNotification } from "@/providers/NotificationProvider";
 import { useLoading } from "@/providers/LoadingProvider";
+import { logout as logoutBackend } from "@/services/AuthService";
 
 export default function TopNavBar({ expanded = true }) {
   const router = useRouter();
-  const dispatch = useDispatch();
+  const { data: session, status } = useSession();
   const { showNotification } = useNotification();
   const { showLoader, hideLoader } = useLoading();
-  const queryClient = useQueryClient();
 
-  // Get user from Redux
-  const { user, isInitialized, status } = useSelector((state) => state.auth);
+  // Get user from NextAuth session
+  const user = session?.user;
 
   // ... (notifications state)
 
@@ -61,12 +59,10 @@ export default function TopNavBar({ expanded = true }) {
   const handleLogout = async () => {
     try {
       showLoader();
-      await dispatch(performLogout());
-      // clear all client caches so logged-out users don't see stale data
-      try {
-        queryClient.clear();
-      } catch (e) {}
-      router.push("/auth/login");
+      // First, logout from backend to close session
+      await logoutBackend();
+      // Then logout from NextAuth
+      await signOut({ callbackUrl: "/auth/login" });
     } catch (err) {
       console.error("Logout failed:", err);
       router.push("/auth/login");

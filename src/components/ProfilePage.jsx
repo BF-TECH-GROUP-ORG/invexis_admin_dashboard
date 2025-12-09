@@ -1,6 +1,7 @@
 "use client";
 
-import { useSelector, useDispatch } from "react-redux";
+import { useDispatch } from "react-redux";
+import { useSession } from "next-auth/react";
 import Image from "next/image";
 import { useState } from "react";
 import DashboardLayout from "@/components/layouts/DashboardLayout";
@@ -30,8 +31,8 @@ import {
 import IOSSwitch from "@/components/shared/IosSwitch";
 import Link from "next/link";
 
-export default function ProfilePage() {
-  const { user } = useSelector((state) => state.auth);
+  const { data: session } = useSession();
+  const user = session?.user;
   const dispatch = useDispatch();
 
   const [activeTab, setActiveTab] = useState("info");

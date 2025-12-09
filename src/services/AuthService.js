@@ -1,7 +1,7 @@
 import api from "@/lib/axios";
 
 /**
- * Login with email/phone/username and password
+ * Login with email/password
  * Returns: { ok: true, accessToken, user: {...} }
  */
 export const login = (credentials) => {
@@ -37,12 +37,6 @@ export const login = (credentials) => {
 };
 
 /**
- * Register a new super admin
- */
-export const registerSuperAdmin = (payload) =>
-  api.post("/auth/register", payload);
-
-/**
  * Refresh access token using httpOnly refresh token cookie
  * Returns: { ok: true, accessToken }
  */
@@ -74,19 +68,13 @@ export const logout = async () => {
 export const getMe = () => api.get("/auth/me");
 
 /**
+ * Update user profile (requires valid access token)
+ * Returns: { ok: true, user: {...} }
+ */
+export const updateProfile = (profileData) => api.put("/auth/me", profileData);
+
+/**
  * Change password (requires valid access token and 2FA if enabled)
  */
 export const changePassword = (payload) =>
   api.post("/auth/me/password/change", payload);
-
-/**
- * Request OTP for passwordless login
- */
-export const requestOtpLogin = (identifier) =>
-  api.post("/auth/login/otp", { identifier });
-
-/**
- * Verify OTP for passwordless login
- */
-export const verifyOtpLogin = (payload) =>
-  api.post("/auth/login/otp/verify", payload);

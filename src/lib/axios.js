@@ -1,10 +1,8 @@
 import axios from "axios";
-import { getToken, removeToken, setToken } from "./authUtils";
-import { refreshToken as apiRefreshToken } from "@/services/AuthService";
 
 // Use NEXT_PUBLIC_API_BASE_URL when available, otherwise use local proxy
-const DEFAULT_BASE = "https://granitic-jule-haunting.ngrok-free.dev/api";
-const baseURL = (process.env.NEXT_PUBLIC_API_BASE_URL || DEFAULT_BASE).replace(
+const DEFAULT_BASE ="https://granitic-jule-haunting.ngrok-free.dev/api";
+const baseURL = (process.env.NEXT_PUBLIC_API_URL || DEFAULT_BASE).replace(
   /\/$/,
   ""
 );
@@ -47,13 +45,6 @@ api.interceptors.request.use(
       // Ensure headers object exists
       config.headers = config.headers || {};
 
-      // Add access token from memory
-      const token = getToken();
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-        console.debug("[Axios] Authorization header set");
-      }
-
       // Add CSRF token for non-safe requests (POST, PUT, DELETE, PATCH)
       const csrfToken = getCsrfToken();
       if (
@@ -74,21 +65,9 @@ api.interceptors.request.use(
 
 /**
  * Response interceptor
- * Handles 401 Unauthorized by attempting to refresh token using httpOnly cookie
- * If refresh succeeds, retries the original request with new token
- * If refresh fails, clears auth state and redirects to login
+ * Simplified for NextAuth - no client-side token refresh
+ * 401 errors redirect to login (NextAuth middleware handles auth)
  */
-let isRefreshing = false;
-let refreshSubscribers = [];
-
-const onRefreshed = (token) => {
-  refreshSubscribers.forEach((callback) => callback(token));
-  refreshSubscribers = [];
-};
-
-const addRefreshSubscriber = (callback) => {
-  refreshSubscribers.push(callback);
-};
 
 api.interceptors.response.use(
   (res) => res,
@@ -110,69 +89,12 @@ api.interceptors.response.use(
       return Promise.reject(err);
     }
 
-    // Handle 401 Unauthorized - try to refresh token
-    if (statusCode === 401 && !originalRequest._retry) {
-      if (typeof window === "undefined") {
-        // Running on server - can't refresh
-        return Promise.reject(err);
-      }
-
-      originalRequest._retry = true;
-
-      // If already refreshing, queue this request
-      if (isRefreshing) {
-        return new Promise(function (resolve, reject) {
-          addRefreshSubscriber((token) => {
-            originalRequest.headers["Authorization"] = "Bearer " + token;
-            resolve(api(originalRequest));
-          });
-        }).catch((err) => {
-          // Refresh failed, reject this request
-          return Promise.reject(err);
-        });
-      }
-
-      // Start refresh process
-      isRefreshing = true;
-
-      try {
-        console.log("[Axios] Attempting token refresh...");
-        // Call refresh endpoint (uses httpOnly cookie)
-        const { data } = await apiRefreshToken();
-        const newToken = data.accessToken;
-
-        if (!newToken) {
-          throw new Error("No access token returned from refresh");
-        }
-
-        // Store new token in memory
-        setToken(newToken);
-        api.defaults.headers.common["Authorization"] = "Bearer " + newToken;
-
-        console.log("[Axios] Token refreshed successfully");
-
-        // Notify all queued requests
-        onRefreshed(newToken);
-        isRefreshing = false;
-
-        // Retry original request with new token
-        originalRequest.headers["Authorization"] = "Bearer " + newToken;
-        return api(originalRequest);
-      } catch (refreshErr) {
-        console.error("[Axios] Token refresh failed", refreshErr.message);
-
-        // Notify all queued requests of failure
-        onRefreshed(null);
-        isRefreshing = false;
-
-        // Clear token and redirect to login
-        removeToken();
-
-        if (typeof window !== "undefined") {
-          window.location.href = "/auth/login";
-        }
-
-        return Promise.reject(refreshErr);
+    // Handle 401 Unauthorized - NextAuth middleware will redirect to login
+    if (statusCode === 401) {
+      console.warn("[Axios] Unauthorized - session expired");
+      // NextAuth middleware handles authentication, let it redirect
+      if (typeof window !== "undefined") {
+        window.location.href = "/auth/login";
       }
     }
 
