@@ -18,7 +18,6 @@ import CompanyService from "../../../services/CompanyService";
 import CategoryService from "../../../services/CategoryService";
 import { useNotification } from "../../../providers/NotificationProvider";
 import { useLoading } from "../../../providers/LoadingProvider";
-import { useDataCache } from "../../../hooks/useDataCache";
 
 const CompanyDetailsPage = () => {
   const { id } = useParams();
@@ -30,20 +29,31 @@ const CompanyDetailsPage = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [tierMenuAnchor, setTierMenuAnchor] = useState(null);
 
-  // Use cached data hook
-  const {
-    data: company,
-    loading,
-    refetch: fetchCompany,
-    updateLocal,
-  } = useDataCache(
-    `company_${id}`,
-    async () => {
+  // Company data state
+  const [company, setCompany] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch company data
+  const fetchCompany = async () => {
+    try {
+      setLoading(true);
       const res = await CompanyService.getById(id);
-      return res?.data || res;
-    },
-    [id]
-  );
+      setCompany(res?.data || res);
+    } catch (error) {
+      console.error("Failed to fetch company:", error);
+      showNotification({
+        message: "Failed to load company details",
+        severity: "error",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Initial load
+  useEffect(() => {
+    fetchCompany();
+  }, [id]);
 
   const handleStatusChange = async (newStatus) => {
     try {

@@ -148,7 +148,7 @@ export default function UsersListTable() {
       await UserService.update(id, { active: !currentStatus });
       showNotification({ message: "User status updated", severity: "success" });
       // Refetch users to update the list
-      const res = await UserService.getAll();
+      const res = await UserService.getCompanyAdmins();
       const userData = res.users || res.data || (Array.isArray(res) ? res : []);
       setUsers(userData);
     } catch (err) {
@@ -173,7 +173,7 @@ export default function UsersListTable() {
         await UserService.delete(id);
         showNotification({ message: "User deleted", severity: "success" });
         // Refetch users to update the list
-        const res = await UserService.getAll();
+        const res = await UserService.getCompanyAdmins();
         const userData =
           res.users || res.data || (Array.isArray(res) ? res : []);
         setUsers(userData);

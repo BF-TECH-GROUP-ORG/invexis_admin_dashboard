@@ -43,7 +43,7 @@ export default function DashboardHome() {
   useEffect(() => {
     const fetchUserCount = async () => {
       try {
-        const res = await UserService.getAll({ page: 1, limit: 1 });
+        const res = await UserService.getCompanyAdmins();
         setUserCount(res?.pagination?.totalItems || res?.data?.length || 0);
       } catch (error) {
         console.error("Failed to fetch user count:", error);

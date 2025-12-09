@@ -26,29 +26,29 @@ const UserService = {
   },
 
   // Admin Routes
-  getAll: async (params = {}) => {
-    // Allow callers to pass in params (including role) but do not force a default role here.
-    // Sometimes the gateway or backend returns transient 5xx/502 errors; retry once and fall back gracefully.
-    let attempts = 0;
-    while (attempts < 2) {
-      try {
-        const res = await api.get("/auth/users", { params });
-        return res.data;
-      } catch (err) {
-        attempts += 1;
-        const status = err?.response?.status;
-        // retry once for server errors (5xx)
-        if (status && status >= 500 && attempts < 2) {
-          await new Promise((r) => setTimeout(r, 250));
-          continue;
-        }
+  // getAll: async (params = {}) => {
+  //   // Allow callers to pass in params (including role) but do not force a default role here.
+  //   // Sometimes the gateway or backend returns transient 5xx/502 errors; retry once and fall back gracefully.
+  //   let attempts = 0;
+  //   while (attempts < 2) {
+  //     try {
+  //       const res = await api.get("/auth/users", { params });
+  //       return res.data;
+  //     } catch (err) {
+  //       attempts += 1;
+  //       const status = err?.response?.status;
+  //       // retry once for server errors (5xx)
+  //       if (status && status >= 500 && attempts < 2) {
+  //         await new Promise((r) => setTimeout(r, 250));
+  //         continue;
+  //       }
 
-        // If all retries fail, return an empty array structure so callers can render gracefully
-        console.error("UserService.getAll failed:", err?.message || err);
-        return [];
-      }
-    }
-  },
+  //       // If all retries fail, return an empty array structure so callers can render gracefully
+  //       console.error("UserService.getAll failed:", err?.message || err);
+  //       return [];
+  //     }
+  //   }
+  // },
   getById: async (id) => {
     const res = await api.get(`/auth/users/${id}`);
     return res.data;

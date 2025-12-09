@@ -143,11 +143,7 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
     let mounted = true;
     (async () => {
       try {
-        const res = await UserService.getAll({
-          role: "company_admin",
-          page: 1,
-          limit: 1000,
-        });
+        const res = await UserService.getCompanyAdmins();
         const usersPayload = res?.users ?? res?.data ?? res ?? [];
         if (mounted) setCompanyAdminOptions(usersPayload);
       } catch (e) {
