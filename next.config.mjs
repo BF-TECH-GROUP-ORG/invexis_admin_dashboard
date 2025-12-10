@@ -4,7 +4,7 @@ const nextConfig = {
     return [
       {
         source: '/api/:path*',
-        destination: 'https://granitic-jule-haunting.ngrok-free.dev/api/:path*',
+        destination: 'https://190c75c48d76.ngrok-free.app/api/:path*',
       },
     ];
   },
