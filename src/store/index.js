@@ -1,11 +1,13 @@
 import { configureStore } from "@reduxjs/toolkit";
-import authReducer from "@/features/AuthSlice";
 import settingsReducer from "@/features/SettingsSlice";
+import webSocketReducer from "@/features/WebSocketSlice";
+import notificationReducer from "@/features/NotificationSlice";
 
 const store = configureStore({
   reducer: {
-    auth: authReducer,
     settings: settingsReducer,
+    webSocket: webSocketReducer,
+    notifications: notificationReducer,
   },
 });
 

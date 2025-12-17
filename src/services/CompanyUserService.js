@@ -32,6 +32,15 @@ const CompanyUserService = {
   },
 
   /**
+   * Get all company-user relationships (optionally paginated)
+   * @param {Object} params - query params (page, limit, search, companyId)
+   */
+  getAll: async (params = {}) => {
+    const res = await api.get(`/company/company-users`, { params });
+    return res.data;
+  },
+
+  /**
    * Get all companies a user is assigned to
    * @param {string} userId - User ID
    * @returns {Promise<Array>} List of companies the user belongs to
@@ -48,7 +57,9 @@ const CompanyUserService = {
    * @returns {Promise<Object>} User-company relationship details
    */
   getUserCompanyRelation: async (companyId, userId) => {
-    const res = await api.get(`/company/company-users/company/${companyId}/user/${userId}`);
+    const res = await api.get(
+      `/company/company-users/company/${companyId}/user/${userId}`
+    );
     return res.data;
   },
 
@@ -60,9 +71,12 @@ const CompanyUserService = {
    * @returns {Promise<Object>} Updated relationship
    */
   updateUserRole: async (companyId, userId, roleId) => {
-    const res = await api.patch(`/company/company-users/company/${companyId}/user/${userId}/role`, {
-      role_id: roleId,
-    });
+    const res = await api.patch(
+      `/company/company-users/company/${companyId}/user/${userId}/role`,
+      {
+        role_id: roleId,
+      }
+    );
     return res.data;
   },
 
@@ -73,7 +87,9 @@ const CompanyUserService = {
    * @returns {Promise<Object>} Updated relationship with suspended status
    */
   suspendUser: async (companyId, userId) => {
-    const res = await api.patch(`/company/company-users/company/${companyId}/user/${userId}/suspend`);
+    const res = await api.patch(
+      `/company/company-users/company/${companyId}/user/${userId}/suspend`
+    );
     return res.data;
   },
 
@@ -84,7 +100,9 @@ const CompanyUserService = {
    * @returns {Promise<Object>} Deletion confirmation
    */
   removeUserFromCompany: async (companyId, userId) => {
-    const res = await api.delete(`/company/company-users/company/${companyId}/user/${userId}`);
+    const res = await api.delete(
+      `/company/company-users/company/${companyId}/user/${userId}`
+    );
     return res.data;
   },
 };

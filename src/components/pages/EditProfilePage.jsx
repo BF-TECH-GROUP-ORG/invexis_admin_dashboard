@@ -1,6 +1,7 @@
 "use client";
 import { useState, useRef } from "react";
-import { useSelector, useDispatch } from "react-redux";
+import { useDispatch } from "react-redux";
+import { useSession } from "next-auth/react";
 import { updateUserSettings } from "@/store/authActions";
 import {
   TextField,
@@ -15,8 +16,8 @@ import { ThemeRegistry } from "@/providers/ThemeRegistry";
 import { RadioGroup, Radio, FormControl } from "@mui/material";
 
 export default function EditProfilePage() {
-  const dispatch = useDispatch();
-  const { user } = useSelector((state) => state.auth);
+  const { data: session } = useSession();
+  const user = session?.user;
 
   const [activeSection, setActiveSection] = useState("profile");
   const fileInputRef = useRef(null);

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   Users,
@@ -19,7 +19,8 @@ import {
   LogOut,
 } from "lucide-react";
 
-import { logout } from "@/services/AuthService";
+import { signOut } from "next-auth/react";
+import { logout as logoutBackend } from "@/services/AuthService";
 
 const navItems = [
   {
@@ -60,12 +61,21 @@ const navItems = [
     icon: <FileSpreadsheet size={22} />,
     path: "/reports",
   },
+  {
+    title: "Roles",
+    icon: <ShieldCheck size={22} />,
+    children: [
+      { title: "All Roles", path: "/roles/list" },
+      { title: "Company Admins", path: "/roles/company-admins" },
+    ],
+  },
 ];
 
 export default function SideBar({
   expanded: controlledExpanded,
   setExpanded: setControlledExpanded,
 }) {
+  const router = useRouter();
   const isControlled =
     typeof controlledExpanded === "boolean" &&
     typeof setControlledExpanded === "function";
@@ -127,8 +137,9 @@ export default function SideBar({
   return (
     <>
       <aside
-        className={`fixed top-0 left-0 z-30 h-screen flex flex-col bg-white border-r border-gray-200 transition-[width] duration-300 ease-in-out ${expanded ? "w-64" : "w-16"
-          }`}
+        className={`fixed top-0 left-0 z-30 h-screen flex flex-col bg-white border-r border-gray-200 transition-[width] duration-300 ease-in-out ${
+          expanded ? "w-64" : "w-16"
+        }`}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-3 py-4 border-b border-gray-200 flex-shrink-0">
@@ -158,12 +169,13 @@ export default function SideBar({
               className="mb-2"
             >
               <div
-                className={`flex items-center justify-between px-3 py-2 rounded-r-lg hover:bg-[#ff782d]/10 cursor-pointer transition-all border-l-4 ${pathname === item.path ||
+                className={`flex items-center justify-between px-3 py-2 rounded-r-lg hover:bg-[#ff782d]/10 cursor-pointer transition-all border-l-4 ${
+                  pathname === item.path ||
                   (item.children &&
                     item.children.some((child) => pathname === child.path))
-                  ? "border-l-[#ff782d] bg-[#ff782d]/5 text-[#ff782d] font-semibold"
-                  : "border-l-transparent text-gray-700 hover:text-[#ff782d]"
-                  }`}
+                    ? "border-l-[#ff782d] bg-[#ff782d]/5 text-[#ff782d] font-semibold"
+                    : "border-l-transparent text-gray-700 hover:text-[#ff782d]"
+                }`}
                 onClick={() =>
                   expanded && item.children && toggleMenu(item.title)
                 }
@@ -187,8 +199,9 @@ export default function SideBar({
                 {item.children && expanded && (
                   <ChevronDown
                     size={20}
-                    className={`transition-transform ${openMenus.includes(item.title) ? "rotate-180" : "rotate-0"
-                      }`}
+                    className={`transition-transform ${
+                      openMenus.includes(item.title) ? "rotate-180" : "rotate-0"
+                    }`}
                   />
                 )}
               </div>
@@ -201,10 +214,11 @@ export default function SideBar({
                       key={child.title}
                       href={child.path}
                       prefetch={true}
-                      className={`text-left px-3 py-2 text-sm rounded transition-colors border-l-4 ${pathname === child.path
-                        ? "border-l-[#ff782d] bg-[#ff782d]/5 text-[#ff782d] font-semibold"
-                        : "border-l-transparent text-gray-500 hover:bg-[#ff782d]/5 hover:text-[#ff782d]"
-                        }`}
+                      className={`text-left px-3 py-2 text-sm rounded transition-colors border-l-4 ${
+                        pathname === child.path
+                          ? "border-l-[#ff782d] bg-[#ff782d]/5 text-[#ff782d] font-semibold"
+                          : "border-l-transparent text-gray-500 hover:bg-[#ff782d]/5 hover:text-[#ff782d]"
+                      }`}
                     >
                       {child.title}
                     </Link>
@@ -220,7 +234,18 @@ export default function SideBar({
           <button
             className="w-full flex items-center justify-center gap-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors duration-200"
             title={expanded ? "Logout" : "Logout"}
-            onClick={logout}
+            onClick={async () => {
+              try {
+                // First, logout from backend to close session
+                await logoutBackend();
+              } catch (error) {
+                console.error("Backend logout error:", error);
+                // Continue with NextAuth logout even if backend fails
+              } finally {
+                // Then logout from NextAuth
+                await signOut({ callbackUrl: "/auth/login" });
+              }
+            }}
           >
             <LogOut size={22} />
             {expanded && <span className="font-medium">Logout</span>}
@@ -254,10 +279,11 @@ export default function SideBar({
                   key={child.title}
                   href={child.path}
                   prefetch={true}
-                  className={`block px-3 py-2 text-sm transition-colors cursor-pointer ${pathname === child.path
-                    ? "bg-[#ff782d]/15 text-[#ff782d] font-semibold hover:bg-[#ff782d]/20"
-                    : "text-gray-700 hover:bg-gray-100 hover:text-[#081422]"
-                    }`}
+                  className={`block px-3 py-2 text-sm transition-colors cursor-pointer ${
+                    pathname === child.path
+                      ? "bg-[#ff782d]/15 text-[#ff782d] font-semibold hover:bg-[#ff782d]/20"
+                      : "text-gray-700 hover:bg-gray-100 hover:text-[#081422]"
+                  }`}
                 >
                   {child.title}
                 </Link>

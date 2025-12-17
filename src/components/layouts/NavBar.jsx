@@ -1,42 +1,48 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Search, Bell, ChevronDown } from "lucide-react";
 import Image from "next/image";
-// framer-motion removed from NavBar (moved into child components as needed)
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useSelector, useDispatch } from "react-redux";
-import { useQueryClient } from "@tanstack/react-query";
+import { useSession, signOut } from "next-auth/react";
+import { useDispatch, useSelector } from "react-redux";
 import NotificationSideBar from "./Notifications_Sidebar";
 import ProfileSidebar from "./ProfileSidebar";
-import { performLogout } from "@/features/AuthSlice";
 import { useNotification } from "@/providers/NotificationProvider";
 import { useLoading } from "@/providers/LoadingProvider";
+import { useWebSocket } from "@/providers/WebSocketProvider";
+import { logout as logoutBackend } from "@/services/AuthService";
+import {
+  fetchNotificationsThunk,
+  markAsReadThunk,
+  markAllAsReadThunk,
+  addNotification,
+  selectNotifications,
+  selectUnreadCount,
+  selectNotificationsLoading,
+} from "@/features/NotificationSlice";
 
 export default function TopNavBar({ expanded = true }) {
   const router = useRouter();
   const dispatch = useDispatch();
+  const { data: session, status } = useSession();
   const { showNotification } = useNotification();
   const { showLoader, hideLoader } = useLoading();
+  const { subscribeNotifications, unsubscribeNotifications, isConnected } =
+    useWebSocket();
 
-  // Get user from Redux
-  const { user, isInitialized, status } = useSelector((state) => state.auth);
+  // Get user from NextAuth session
+  const user = session?.user;
 
-  // ... (notifications state)
+  // Redux state for notifications
+  const notifications = useSelector(selectNotifications);
+  const unreadCount = useSelector(selectUnreadCount);
+  const notificationsLoading = useSelector(selectNotificationsLoading);
 
   // State management
   const [profileOpen, setProfileOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
-
-  // Dummy notifications
-  const [notifications, setNotifications] = useState([
-    { id: 1, message: "New user registered", read: false, time: "5m ago" },
-    { id: 2, message: "Company verified", read: false, time: "1h ago" },
-    { id: 3, message: "New order placed", read: true, time: "2h ago" },
-  ]);
-
-  // Wait for initialization - keep navbar visible, don't early-return (hooks must be stable)
 
   // Fallback for user data if not loaded yet
   const displayUser = user || {
@@ -51,28 +57,73 @@ export default function TopNavBar({ expanded = true }) {
     ? `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.username
     : "Guest";
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  // Fetch notifications on mount and when user changes
+  useEffect(() => {
+    if (user?.id) {
+      dispatch(
+        fetchNotificationsThunk({
+          userId: user.id,
+          options: { companyId: user.companyId, limit: 20 },
+        })
+      );
+    }
+  }, [user?.id, user?.companyId, dispatch]);
 
-  // profile data is handled by the ProfileSidebar component
+  // Subscribe to real-time notifications via WebSocket
+  useEffect(() => {
+    if (!user?.id || !isConnected) return;
 
-  // Profile update is handled in ProfileSidebar component
+    const handleNewNotification = (notification) => {
+      console.log("[NavBar] New notification received:", notification);
+      dispatch(addNotification({ notification, userId: user.id }));
+      // Show toast notification
+      showNotification({
+        message: notification.title || "New notification",
+        severity: "info",
+      });
+    };
 
-  const handleLogout = () => {
-    dispatch(logout());
-    router.push("/auth/login");
+    subscribeNotifications(handleNewNotification);
+
+    return () => {
+      unsubscribeNotifications();
+    };
+  }, [
+    user?.id,
+    isConnected,
+    subscribeNotifications,
+    unsubscribeNotifications,
+    dispatch,
+    showNotification,
+  ]);
+
+  const handleLogout = async () => {
+    try {
+      showLoader();
+      await logoutBackend();
+      await signOut({ callbackUrl: "/auth/login" });
+    } catch (err) {
+      console.error("Logout failed:", err);
+      router.push("/auth/login");
+    } finally {
+      hideLoader();
+    }
   };
 
-  const handleMarkRead = (id) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
-    );
-  };
+  const handleMarkRead = useCallback(
+    (id) => {
+      if (user?.id) {
+        dispatch(markAsReadThunk({ userId: user.id, notificationIds: [id] }));
+      }
+    },
+    [user?.id, dispatch]
+  );
 
-  const handleMarkAllRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-  };
-
-  // Profile editable fields moved to ProfileSidebar
+  const handleMarkAllRead = useCallback(() => {
+    if (user?.id) {
+      dispatch(markAllAsReadThunk({ userId: user.id }));
+    }
+  }, [user?.id, dispatch]);
 
   return (
     <>
@@ -167,6 +218,8 @@ export default function TopNavBar({ expanded = true }) {
         notifications={notifications}
         onMarkRead={handleMarkRead}
         onMarkAll={handleMarkAllRead}
+        loading={notificationsLoading}
+        unreadCount={unreadCount}
       />
     </>
   );

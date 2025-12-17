@@ -94,42 +94,45 @@ export default function CategoriesTable({
     return result;
   }, [categories, sort]);
 
-  // Fetch categories from backend
-  const fetchCategories = async () => {
-    showLoader();
-    try {
-      const response = await CategoryService.getCategories({
-        page: page + 1, // API expects 1-indexed page
-        limit: rowsPerPage,
-        search,
-        level: levelFilter,
-        parent: parentFilter,
-        sort,
-      });
-
-      // Response shape may vary between gateways/backends (res.data vs res.data.data).
-      // Normalize to { categories: [], totalCount: number }
-      const payload = response?.data ?? response ?? {};
-      const categoriesResult =
-        payload.categories ??
-        payload.data ??
-        (Array.isArray(payload) ? payload : []);
-      const total =
-        payload.totalCount ??
-        payload.total ??
-        (Array.isArray(categoriesResult) ? categoriesResult.length : 0);
-
-      setCategories(categoriesResult);
-      setTotalCount(total);
-    } catch (error) {
-      console.error("Failed to fetch categories:", error);
-      showNotification("Failed to fetch categories.", "error");
-    } finally {
-      hideLoader();
-    }
-  };
+  // Fetch categories directly from API
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
+    const fetchCategories = async () => {
+      setIsLoading(true);
+      showLoader();
+      try {
+        const response = await CategoryService.getCategories({
+          page: page + 1,
+          limit: rowsPerPage,
+          search,
+          level: levelFilter,
+          parent: parentFilter,
+          sort,
+        });
+
+        const payload = response?.data ?? response ?? {};
+        const categoriesResult =
+          payload.categories ??
+          payload.data ??
+          (Array.isArray(payload) ? payload : []);
+        const total =
+          payload.totalCount ??
+          payload.total ??
+          (Array.isArray(categoriesResult) ? categoriesResult.length : 0);
+
+        setCategories(categoriesResult);
+        setTotalCount(total);
+      } catch (error) {
+        console.error("Failed to fetch categories:", error);
+        setCategories([]);
+        setTotalCount(0);
+      } finally {
+        setIsLoading(false);
+        hideLoader();
+      }
+    };
+
     fetchCategories();
   }, [page, rowsPerPage, search, levelFilter, parentFilter, sort]);
 
@@ -179,7 +182,26 @@ export default function CategoriesTable({
     try {
       await CategoryService.deleteCategory(id);
       showNotification("Category deleted successfully!", "success");
-      fetchCategories();
+      // Refetch categories after deletion
+      const response = await CategoryService.getCategories({
+        page: page + 1,
+        limit: rowsPerPage,
+        search,
+        level: levelFilter,
+        parent: parentFilter,
+        sort,
+      });
+      const payload = response?.data ?? response ?? {};
+      const categoriesResult =
+        payload.categories ??
+        payload.data ??
+        (Array.isArray(payload) ? payload : []);
+      const total =
+        payload.totalCount ??
+        payload.total ??
+        (Array.isArray(categoriesResult) ? categoriesResult.length : 0);
+      setCategories(categoriesResult);
+      setTotalCount(total);
     } catch (error) {
       console.error("Failed to delete category:", error);
       showNotification("Failed to delete category.", "error");

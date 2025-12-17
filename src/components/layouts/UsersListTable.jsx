@@ -46,8 +46,9 @@ export default function UsersListTable() {
       setIsLoading(true);
       setError(null);
       try {
-        const res = await UserService.getAll();
-        const userData = res.users || res.data || (Array.isArray(res) ? res : []);
+        const res = await UserService.getCompanyAdmins();
+        const userData =
+          res.users || res.data || (Array.isArray(res) ? res : []);
         setUsers(userData);
       } catch (err) {
         console.error("Failed to fetch users:", err);
@@ -73,8 +74,6 @@ export default function UsersListTable() {
   const { showLoader, hideLoader } = useLoading();
   const router = useRouter();
 
-
-
   // persist filters/search to settings
   useEffect(() => {
     try {
@@ -85,7 +84,7 @@ export default function UsersListTable() {
           filters: { search, roleFilter, statusFilter },
         },
       });
-    } catch (e) { }
+    } catch (e) {}
   }, [search, roleFilter, statusFilter]);
 
   const filteredUsers = useMemo(() => {
@@ -143,19 +142,27 @@ export default function UsersListTable() {
   };
 
   const handleToggleActive = async (id, currentStatus) => {
-    // Optimistic update
-    queryClient.setQueryData(["users_list"], (old) =>
-      old ? old.map((u) => (u.id === id || u._id === id ? { ...u, active: !currentStatus } : u)) : []
-    );
-
     // TODO: Implement API call to toggle status if endpoint exists
-    // await UserService.update(id, { active: !currentStatus });
-
+    // Manual refresh of data after status change
+    try {
+      await UserService.update(id, { active: !currentStatus });
+      showNotification({ message: "User status updated", severity: "success" });
+      // Refetch users to update the list
+      const res = await UserService.getCompanyAdmins();
+      const userData = res.users || res.data || (Array.isArray(res) ? res : []);
+      setUsers(userData);
+    } catch (err) {
+      console.error("Failed to update status", err);
+      showNotification({
+        message: "Failed to update status",
+        severity: "error",
+      });
+    }
     setOpenMenu(null);
   };
 
   const handleEditUser = (id) => {
-    router.push(`/users/edit/${id}`); // Assuming edit page exists or will exist
+    router.push(`/users/edit/${id}`);
     setOpenMenu(null);
   };
 
@@ -164,12 +171,17 @@ export default function UsersListTable() {
       try {
         showLoader();
         await UserService.delete(id);
-        queryClient.setQueryData(["users_list"], (old) =>
-          old ? old.filter((u) => (u.id || u._id) !== id) : []
-        );
         showNotification({ message: "User deleted", severity: "success" });
+        // Refetch users to update the list
+        const res = await UserService.getCompanyAdmins();
+        const userData =
+          res.users || res.data || (Array.isArray(res) ? res : []);
+        setUsers(userData);
       } catch (err) {
-        showNotification({ message: "Failed to delete user", severity: "error" });
+        showNotification({
+          message: "Failed to delete user",
+          severity: "error",
+        });
       } finally {
         hideLoader();
         setOpenMenu(null);
@@ -362,25 +374,41 @@ export default function UsersListTable() {
                               backgroundColor: "#fff8f5",
                               color: "#ff782d",
                               fontWeight: 600,
-                              textTransform: "capitalize"
+                              textTransform: "capitalize",
                             }}
                           />
                         </TableCell>
 
                         <TableCell>
-                          <Typography variant="body2">{u.position || "-"}</Typography>
+                          <Typography variant="body2">
+                            {u.position || "-"}
+                          </Typography>
                           {u.department && (
-                            <Typography variant="caption" color="text.secondary">
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
                               {u.department.replace("_", " ")}
                             </Typography>
                           )}
                         </TableCell>
 
                         <TableCell>
-                          <Typography variant="body2" noWrap sx={{ maxWidth: 150 }}>
-                            {u.companies?.length ? `${u.companies.length} Companies` : "-"}
+                          <Typography
+                            variant="body2"
+                            noWrap
+                            sx={{ maxWidth: 150 }}
+                          >
+                            {u.companies?.length
+                              ? `${u.companies.length} Companies`
+                              : "-"}
                           </Typography>
-                          <Typography variant="caption" color="text.secondary" noWrap sx={{ maxWidth: 150 }}>
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            noWrap
+                            sx={{ maxWidth: 150 }}
+                          >
                             {u.shops?.length ? `${u.shops.length} Shops` : ""}
                           </Typography>
                         </TableCell>
@@ -388,7 +416,9 @@ export default function UsersListTable() {
                         <TableCell>
                           <IOSSwitch
                             checked={Boolean(u?.accountStatus)}
-                            onChange={() => handleToggleActive(userId, u.accountStatus)}
+                            onChange={() =>
+                              handleToggleActive(userId, u.accountStatus)
+                            }
                           />
                         </TableCell>
 
@@ -398,7 +428,9 @@ export default function UsersListTable() {
                               <IconButton
                                 size="small"
                                 onClick={() =>
-                                  setOpenMenu(openMenu === userId ? null : userId)
+                                  setOpenMenu(
+                                    openMenu === userId ? null : userId
+                                  )
                                 }
                               >
                                 <HiDotsVertical />

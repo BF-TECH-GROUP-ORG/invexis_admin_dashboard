@@ -12,10 +12,12 @@ import {
   Check,
   Upload,
   Image as ImageIcon,
+  Image as ImageIcon,
 } from "lucide-react";
 
 const EditCategoryForm = ({ initialData }) => {
   const router = useRouter();
+
   const [currentStep, setCurrentStep] = useState(1);
   const { showNotification } = useNotification();
   const loadingHelpers = useLoading();
