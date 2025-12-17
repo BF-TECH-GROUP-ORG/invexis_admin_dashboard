@@ -144,10 +144,16 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
     (async () => {
       try {
         const res = await UserService.getCompanyAdmins();
-        const usersPayload = res?.users ?? res?.data ?? res ?? [];
-        if (mounted) setCompanyAdminOptions(usersPayload);
+        const usersPayload = res?.admins ?? res ?? [];
+        // Ensure we always set an array to prevent .map() errors
+        if (mounted) {
+          setCompanyAdminOptions(
+            Array.isArray(usersPayload) ? usersPayload : []
+          );
+        }
       } catch (e) {
         console.error("Failed to fetch company admin users", e);
+        if (mounted) setCompanyAdminOptions([]);
       }
     })();
     return () => (mounted = false);
@@ -317,55 +323,7 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
           severity: "success",
         });
 
-        // If the form included admin_user_ids, try assign those users to the created company
-        const admins = formData.admin_user_ids || [];
-        if (admins.length > 0 && createdCompanyId) {
-          // ensure a company-level role exists for company_admin
-          let roleObj = null;
-          try {
-            const findResp = await RoleService.getRoleByName(
-              createdCompanyId,
-              "company_admin"
-            );
-            roleObj = findResp?.data ?? findResp;
-          } catch (err) {
-            // ignore - will attempt to create
-          }
-
-          if (!roleObj || (!roleObj._id && !roleObj.id)) {
-            try {
-              const createResp = await RoleService.create({
-                name: "company_admin",
-                company_id: createdCompanyId,
-                description: "Default company admin role",
-                permissions: [],
-              });
-              roleObj = createResp?.data ?? createResp;
-            } catch (err) {
-              console.warn("Failed to ensure company_admin role exists", err);
-            }
-          }
-
-          const roleId = roleObj?.id ?? roleObj?._id ?? null;
-
-          const assignPromises = admins.map(async (uid) => {
-            try {
-              await CompanyUserService.assignUserToCompany({
-                company_id: createdCompanyId,
-                user_id: uid,
-                role_id: roleId,
-                status: "active",
-              });
-            } catch (err) {
-              console.error("Failed to assign admin to company", uid, err);
-            }
-          });
-
-          try {
-            await Promise.all(assignPromises);
-          } catch (e) {}
-        }
-
+        // Admin assignment is handled by the backend
         if (onSuccess) onSuccess(res.data || res);
         router.push("/clients/list");
       } else {

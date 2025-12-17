@@ -47,8 +47,7 @@ export default function UsersListTable() {
       setError(null);
       try {
         const res = await UserService.getCompanyAdmins();
-        const userData =
-          res.users || res.data || (Array.isArray(res) ? res : []);
+        const userData = res.admins || (Array.isArray(res) ? res : []);
         setUsers(userData);
       } catch (err) {
         console.error("Failed to fetch users:", err);

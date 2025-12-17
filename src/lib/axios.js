@@ -1,7 +1,9 @@
 import axios from "axios";
+import { getSession } from "next-auth/react";
+import { notificationBus } from "./notificationBus";
 
 // Use NEXT_PUBLIC_API_BASE_URL when available, otherwise use local proxy
-const DEFAULT_BASE ="https://granitic-jule-haunting.ngrok-free.dev/api";
+const DEFAULT_BASE = "https://granitic-jule-haunting.ngrok-free.dev/api";
 const baseURL = (process.env.NEXT_PUBLIC_API_URL || DEFAULT_BASE).replace(
   /\/$/,
   ""
@@ -38,12 +40,32 @@ const getCsrfToken = () => {
  * Attaches access token (Bearer) and CSRF token to each request
  */
 api.interceptors.request.use(
-  (config) => {
+  async (config) => {
     console.log(`[Axios] ${config.method?.toUpperCase()} ${config.url}`);
 
     if (typeof window !== "undefined") {
       // Ensure headers object exists
       config.headers = config.headers || {};
+
+      try {
+        // Get session and add Authorization header
+        console.log("[Axios] Fetching session...");
+        const session = await getSession();
+
+        if (session) {
+          console.log("[Axios] Session found");
+          if (session.accessToken) {
+            console.log("[Axios] Access token found, attaching to header");
+            config.headers.Authorization = `Bearer ${session.accessToken}`;
+          } else {
+            console.warn("[Axios] Session exists but no accessToken found");
+          }
+        } else {
+          console.warn("[Axios] No session found (getSession returned null)");
+        }
+      } catch (error) {
+        console.error("[Axios] Error fetching session:", error);
+      }
 
       // Add CSRF token for non-safe requests (POST, PUT, DELETE, PATCH)
       const csrfToken = getCsrfToken();
@@ -92,10 +114,35 @@ api.interceptors.response.use(
     // Handle 401 Unauthorized - NextAuth middleware will redirect to login
     if (statusCode === 401) {
       console.warn("[Axios] Unauthorized - session expired");
+      // Optional: don't show notification for 401 if it redirects?
+      // But maybe good to know session expired.
+      notificationBus.emit({
+        message: "Session expired. Please login again.",
+        severity: "error",
+      });
+
       // NextAuth middleware handles authentication, let it redirect
       if (typeof window !== "undefined") {
         window.location.href = "/auth/login";
       }
+    } else if (statusCode === 403) {
+      // Handle 403 Forbidden
+      notificationBus.emit({
+        message:
+          err.response?.data?.message ||
+          "You do not have permission to perform this action.",
+        severity: "error",
+      });
+    } else if (errorCode !== "ERR_CANCELED") {
+      // Generic error for others
+      const msg =
+        err.response?.data?.message ||
+        err.message ||
+        "An unexpected error occurred.";
+      notificationBus.emit({
+        message: msg,
+        severity: "error",
+      });
     }
 
     return Promise.reject(err);
