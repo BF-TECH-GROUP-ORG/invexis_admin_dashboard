@@ -100,7 +100,9 @@ export default function TopNavBar({ expanded = true }) {
   const handleLogout = async () => {
     try {
       showLoader();
-      await logoutBackend();
+      // First, logout from backend to close session (send access token)
+      await logoutBackend(session?.accessToken);
+      // Then logout from NextAuth
       await signOut({ callbackUrl: "/auth/login" });
     } catch (err) {
       console.error("Logout failed:", err);
@@ -215,11 +217,6 @@ export default function TopNavBar({ expanded = true }) {
         expanded={expanded}
         isOpen={notifOpen}
         onClose={() => setNotifOpen(false)}
-        notifications={notifications}
-        onMarkRead={handleMarkRead}
-        onMarkAll={handleMarkAllRead}
-        loading={notificationsLoading}
-        unreadCount={unreadCount}
       />
     </>
   );

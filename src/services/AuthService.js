@@ -45,11 +45,17 @@ export const refreshToken = () => api.post("/auth/refresh");
 /**
  * Logout user and invalidate session on backend
  * Requires valid authorization header (access token)
+ * @param {string} token - Optional access token to send with logout request
  */
-export const logout = async () => {
+export const logout = async (token = null) => {
   try {
+    const headers = {};
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
     // Send logout request to backend so server can invalidate session/cookie
-    const response = await api.post("/auth/logout");
+    const response = await api.post("/auth/logout", {}, { headers });
     return response.data;
   } catch (err) {
     console.error(

@@ -19,7 +19,7 @@ import {
   LogOut,
 } from "lucide-react";
 
-import { signOut } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 import { logout as logoutBackend } from "@/services/AuthService";
 
 const navItems = [
@@ -76,6 +76,7 @@ export default function SideBar({
   setExpanded: setControlledExpanded,
 }) {
   const router = useRouter();
+  const { data: session } = useSession();
   const isControlled =
     typeof controlledExpanded === "boolean" &&
     typeof setControlledExpanded === "function";
@@ -236,8 +237,8 @@ export default function SideBar({
             title={expanded ? "Logout" : "Logout"}
             onClick={async () => {
               try {
-                // First, logout from backend to close session
-                await logoutBackend();
+                // First, logout from backend to close session (send access token)
+                await logoutBackend(session?.accessToken);
               } catch (error) {
                 console.error("Backend logout error:", error);
                 // Continue with NextAuth logout even if backend fails
