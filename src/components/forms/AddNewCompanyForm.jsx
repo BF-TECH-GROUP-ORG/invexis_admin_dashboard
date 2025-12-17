@@ -35,6 +35,7 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
 
   // Categories state
   const [categoriesList, setCategoriesList] = useState([]);
+  const [categorySearch, setCategorySearch] = useState("");
   // Company admin user selection
   const [companyAdminOptions, setCompanyAdminOptions] = useState([]);
   const [categoryStats, setCategoryStats] = useState({ level1: 0, level3: 0 });
@@ -67,6 +68,14 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
       );
     });
   }, [adminSearch, companyAdmins]);
+
+  // Filtered categories
+  const filteredCategories = useMemo(() => {
+    if (!categorySearch) return categoriesList;
+    return categoriesList.filter((c) =>
+      c.name.toLowerCase().includes(categorySearch.toLowerCase())
+    );
+  }, [categorySearch, categoriesList]);
 
   const selectedCountry = COUNTRIES.find((c) => c.name === formData.country);
   const selectedAdmin = companyAdmins.find(
@@ -442,7 +451,7 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
                     </div>
 
                     {/* Assign existing Company Admins (multi-select) */}
-                    <div>
+                    {/* <div>
                       <label className="block text-sm font-semibold text-[#081422] mb-2">
                         Assign Company Admins
                       </label>
@@ -508,7 +517,7 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
                           </p>
                         )}
                       </div>
-                    </div>
+                    </div> */}
                   </>
                 )}
 
@@ -556,9 +565,18 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
                         <span
                           className={!formData.country ? "text-[#6b7280]" : ""}
                         >
-                          {selectedCountry
-                            ? `${selectedCountry.flag} ${selectedCountry.name}`
-                            : formData.country || "Select a country"}
+                          {selectedCountry ? (
+                            <span className="flex items-center gap-2">
+                              <img
+                                src={`https://flagcdn.com/w40/${selectedCountry.code.toLowerCase()}.png`}
+                                alt={selectedCountry.name}
+                                className="w-6 h-auto rounded-sm"
+                              />
+                              {selectedCountry.name}
+                            </span>
+                          ) : (
+                            formData.country || "Select a country"
+                          )}
                         </span>
                         <ChevronRight
                           className={`transform transition-transform ${
@@ -595,7 +613,11 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
                                     : "hover:bg-[#f3f4f6] text-[#081422]"
                                 }`}
                               >
-                                <span className="text-2xl">{c.flag}</span>
+                                <img
+                                  src={`https://flagcdn.com/w40/${c.code.toLowerCase()}.png`}
+                                  alt={c.name}
+                                  className="w-6 h-auto rounded-sm"
+                                />
                                 <span className="font-medium">{c.name}</span>
                               </div>
                             ))}
@@ -740,18 +762,29 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
                       <label className="block text-sm font-semibold text-[#081422] mb-2">
                         Select Categories (Level 2)
                       </label>
+                      <div className="mb-4">
+                        <input
+                          type="text"
+                          value={categorySearch}
+                          onChange={(e) => setCategorySearch(e.target.value)}
+                          placeholder="Search categories..."
+                          className="w-full px-4 py-2 rounded-xl border-2 border-[#d1d5db] outline-none focus:border-[#ff782d] bg-white text-[#081422] placeholder-[#6b7280] text-sm"
+                        />
+                      </div>
                       <p className="text-xs text-[#6b7280] mb-3">
                         Selecting a Level 2 category will automatically link
                         related Level 1 and Level 3 categories.
                       </p>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-96 overflow-y-auto p-1">
-                        {categoriesList.length === 0 && (
+                        {filteredCategories.length === 0 && (
                           <div className="col-span-2 text-center p-4 text-[#6b7280] border-2 border-dashed border-[#d1d5db] rounded-xl">
-                            No Level 2 categories available
+                            {categoriesList.length === 0
+                              ? "No Level 2 categories available"
+                              : "No categories match your search"}
                           </div>
                         )}
-                        {categoriesList.map((cat) => {
+                        {filteredCategories.map((cat) => {
                           const isSelected = formData.category_ids.includes(
                             cat.id || cat._id
                           );
@@ -1013,7 +1046,9 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
 
                 {currentStep === steps.length ? (
                   <button
-                    type="submit"
+                    type="button"
+                    key="submit-btn"
+                    onClick={handleSubmit}
                     className="flex items-center gap-2 px-6 py-3 rounded-2xl font-semibold bg-[#ff782d] text-white hover:bg-[#ff6b1a] transition-all"
                   >
                     <Check size={20} />
@@ -1022,6 +1057,7 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
                 ) : (
                   <button
                     type="button"
+                    key="next-btn"
                     onClick={handleNext}
                     className="flex items-center gap-2 px-6 py-3 rounded-2xl font-semibold bg-[#ff782d] text-white hover:bg-[#ff6b1a] transition-all"
                   >
