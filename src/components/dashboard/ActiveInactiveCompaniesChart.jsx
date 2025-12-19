@@ -32,7 +32,20 @@ const CustomTooltip = ({ active, payload }) => {
   return null;
 };
 
-export default function ActiveInactiveCompaniesChart({ data }) {
+export default function ActiveInactiveCompaniesChart({ data = [] }) {
+  if (!data || data.length === 0) {
+    return (
+      <div className="p-6 rounded-xl border border-neutral-300 bg-white">
+        <h2 className="text-lg font-semibold mb-4">
+          Active / Inactive Companies
+        </h2>
+        <div className="w-full h-72 flex items-center justify-center">
+          <p className="text-neutral-400 text-sm">No company data available</p>
+        </div>
+      </div>
+    );
+  }
+
   // Calculate totals for percentage calculation
   const totalActive = data[0]?.value || 0;
   const totalInactive = data[1]?.value || 0;
@@ -88,10 +101,10 @@ export default function ActiveInactiveCompaniesChart({ data }) {
           </div>
           <div className="flex items-center gap-4">
             <span className="font-semibold text-neutral-900">
-              {data[0].value}
+              {data[0]?.value || 0}
             </span>
             <span className="text-neutral-500">
-              ({((totalActive / total) * 100).toFixed(1)}%)
+              ({total > 0 ? ((totalActive / total) * 100).toFixed(1) : 0}%)
             </span>
           </div>
         </div>
@@ -106,10 +119,10 @@ export default function ActiveInactiveCompaniesChart({ data }) {
           </div>
           <div className="flex items-center gap-4">
             <span className="font-semibold text-neutral-900">
-              {data[1].value}
+              {data[1]?.value || 0}
             </span>
             <span className="text-neutral-500">
-              ({((totalInactive / total) * 100).toFixed(1)}%)
+              ({total > 0 ? ((totalInactive / total) * 100).toFixed(1) : 0}%)
             </span>
           </div>
         </div>

@@ -17,6 +17,8 @@ import {
   Unlock,
   Tag,
   LogOut,
+  BarChart3,
+  Bell,
 } from "lucide-react";
 
 import { signOut, useSession } from "next-auth/react";
@@ -27,6 +29,24 @@ const navItems = [
     title: "Dashboard",
     icon: <LayoutDashboard size={22} />,
     path: "/",
+  },
+
+  {
+    title: "Analytics",
+    icon: <BarChart3 size={22} />,
+    children: [
+      { title: "Sales & Financial", path: "/analytics/sales" },
+      { title: "Inventory & Operations", path: "/analytics/inventory" },
+      { title: "Customers", path: "/analytics/customers" },
+      { title: "Staff & Shops", path: "/analytics/staff" },
+      { title: "Platform Health", path: "/analytics/platform" },
+    ],
+  },
+
+  {
+    title: "Notifications",
+    icon: <Bell size={22} />,
+    path: "/notifications",
   },
 
   {

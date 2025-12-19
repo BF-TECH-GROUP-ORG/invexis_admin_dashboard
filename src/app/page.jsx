@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import StatCard from "@/components/dashboard/StatCard";
 import SalesAnalyticsChart from "@/components/dashboard/SalesAnalyticsChart";
+import RevenueAnalyticsChart from "@/components/dashboard/RevenueAnalyticsChart";
+import PaymentMethodsChart from "@/components/dashboard/PaymentMethodsChart";
 import TrendingInsightsTable from "@/components/dashboard/TrendingInsightsTable";
 import TopSellingCompaniesChart from "@/components/dashboard/TopSellingCompaniesChart";
 import ActiveInactiveCompaniesChart from "@/components/dashboard/ActiveInactiveCompaniesChart";
@@ -17,6 +19,7 @@ import {
   topSellingCompanies,
   trendingData,
 } from "@/data/mockData";
+import { revenueOrderData, paymentMethodsData } from "@/data/analyticsData";
 
 export default function DashboardHome() {
   const [salesPeriod, setSalesPeriod] = useState("monthly");
@@ -111,6 +114,9 @@ export default function DashboardHome() {
             onPeriodChange={setSalesPeriod}
           />
 
+          {/* REVENUE & ORDER ANALYTICS */}
+          <RevenueAnalyticsChart data={revenueOrderData} />
+
           {/* TRENDING INSIGHTS TABLE */}
           <TrendingInsightsTable
             data={trendingData}
@@ -126,6 +132,9 @@ export default function DashboardHome() {
         <div className="flex flex-col gap-6">
           {/* ACTIVE/INACTIVE COMPANIES */}
           <ActiveInactiveCompaniesChart data={companyStatusData} />
+
+          {/* PAYMENT METHODS */}
+          <PaymentMethodsChart data={paymentMethodsData} />
 
           {/* RECENT REGISTERED COMPANIES */}
           <RecentCompaniesCard companies={companies} />

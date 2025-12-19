@@ -14,7 +14,25 @@ const PRIMARY_COLORS = {
   orange: "#ff782d",
 };
 
-export default function TopSellingCompaniesChart({ data }) {
+export default function TopSellingCompaniesChart({ data = [] }) {
+  if (!data || data.length === 0) {
+    return (
+      <div className="p-6 rounded-xl border border-neutral-300 bg-white">
+        <div className="mb-6">
+          <h2 className="text-xl font-semibold mb-1">
+            Top 20 Best-Selling Companies
+          </h2>
+          <p className="text-sm text-neutral-500">
+            Companies with highest sales performance
+          </p>
+        </div>
+        <div className="w-full h-96 flex items-center justify-center">
+          <p className="text-neutral-400 text-sm">No company data available</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 rounded-xl border border-neutral-300 bg-white">
       <div className="mb-6">
@@ -55,7 +73,7 @@ export default function TopSellingCompaniesChart({ data }) {
               }}
             />
             <Bar
-              dataKey="sales"
+              dataKey="revenue"
               fill={PRIMARY_COLORS.orange}
               radius={[0, 8, 8, 0]}
               isAnimationActive={true}

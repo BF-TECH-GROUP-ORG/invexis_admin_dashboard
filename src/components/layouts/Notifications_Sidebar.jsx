@@ -1,172 +1,145 @@
 "use client";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import {
   X,
   Check,
   CheckCircle,
   Bell,
   Trash2,
-  Package,
+  Activity,
+  CreditCard,
   AlertTriangle,
-  Info,
-  Calendar,
+  TrendingUp,
+  UserCheck,
+  ExternalLink
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
+import {
+  fetchNotificationsThunk,
+  markAsReadThunk,
+  selectNotifications,
+  selectUnreadCount,
+  selectNotificationsLoading,
+} from "@/features/NotificationSlice";
+import {
+  IntentTabs,
+  getIntentUI,
+  getPriorityStyle,
+  filterByIntent
+} from "@/constants/notifications";
 
-// Get icon background color based on notification type
-const getTypeColor = (type) => {
-  const colors = {
-    success: "bg-green-500",
-    error: "bg-red-500",
-    warning: "bg-yellow-500",
-    info: "bg-blue-500",
-    general: "bg-gray-400",
-  };
-  return colors[type] || colors.general;
+// Icon mapping for dynamic rendering
+const IconMap = {
+  Activity,
+  CreditCard,
+  AlertTriangle,
+  TrendingUp,
+  UserCheck,
+  Bell
 };
-
-// --- MOCK DATA ---
-const MOCK_NOTIFICATIONS = [
-  {
-    id: 1,
-    type: "order",
-    title: "New Order #1023",
-    desc: "A new order for $1,200 has been placed by Apple Inc.",
-    full: "Order #1023 requires processing. Ordered items: 50x MacBook Pro Stickers. Verify payment and shipping address.",
-    time: new Date(Date.now() - 1000 * 60 * 5), // 5 mins ago
-    unread: true,
-    avatar:
-      "https://ui-avatars.com/api/?name=Apple+Inc&background=000&color=fff",
-  },
-  {
-    id: 2,
-    type: "system",
-    title: "System Update",
-    desc: "Scheduled maintenance in 2 hours.",
-    full: "The platform will be undergoing scheduled maintenance from 03:00 AM to 04:00 AM UTC. Please save your work.",
-    time: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
-    unread: true,
-    icon: <Info className="w-5 h-5 text-blue-500" />,
-  },
-  {
-    id: 3,
-    type: "alert",
-    title: "Low Stock Alert",
-    desc: "Item 'Wireless Mouse' is running low.",
-    full: "Only 5 units of 'Wireless Mouse' remaining in warehouse NYC-1. Please restock immediately to avoid shortages.",
-    time: new Date(Date.now() - 1000 * 60 * 60 * 5), // 5 hours ago
-    unread: false,
-    icon: <AlertTriangle className="w-5 h-5 text-orange-500" />,
-  },
-  {
-    id: 4,
-    type: "message",
-    title: "New Message from John",
-    desc: "Hey, can you check the sales report?",
-    full: "John Doe sent you a message: 'Hey, I noticed a discrepancy in the Q3 sales report. Can we meet to discuss this?'",
-    time: new Date(Date.now() - 1000 * 60 * 60 * 24), // 1 day ago
-    unread: false,
-    avatar:
-      "https://ui-avatars.com/api/?name=John+Doe&background=2563EB&color=fff",
-  },
-  {
-    id: 5,
-    type: "order",
-    title: "Order Delivered",
-    desc: "Order #998 has been delivered.",
-    full: "Customer confirmed receipt of Order #998. The transaction is now complete.",
-    time: new Date(Date.now() - 1000 * 60 * 60 * 48), // 2 days ago
-    unread: true,
-    icon: <Package className="w-5 h-5 text-green-500" />,
-  },
-];
 
 function NotificationSideBar({
   expanded = true,
   isOpen = false,
-  onClose = () => {},
-<<<<<<< HEAD
-  notifications = [],
-  onMarkRead = () => {},
-  onMarkAll = () => {},
-  loading = false,
-  unreadCount = 0,
-=======
-  // Optional: Allow parent to override or we use internal mock if empy
-  notifications: propNotifications = [],
->>>>>>> 10c61ac9eef67dfebaa502362d59231ecad47fe9
+  onClose = () => { },
 }) {
-  const [internalNotifications, setInternalNotifications] = useState(
-    propNotifications.length > 0 ? propNotifications : MOCK_NOTIFICATIONS
-  );
+  const router = useRouter();
+  const dispatch = useDispatch();
+  const { data: session } = useSession();
+  const user = session?.user;
+
+  // Redux state
+  const notifications = useSelector(selectNotifications);
+  const unreadCount = useSelector(selectUnreadCount);
+  const loading = useSelector(selectNotificationsLoading);
+
   const [activeNotif, setActiveNotif] = useState(null);
-  const [filter, setFilter] = useState("all"); // 'all' | 'unread'
+  const [activeTab, setActiveTab] = useState('all'); // Intent tab
+  const [showUnreadOnly, setShowUnreadOnly] = useState(false);
+
+  // Fetch notifications when sidebar opens
+  useEffect(() => {
+    if (isOpen && user?.id) {
+      dispatch(fetchNotificationsThunk({
+        userId: user.id,
+        options: {
+          companyId: user.companyId,
+          limit: 50,
+        },
+      }));
+    }
+  }, [isOpen, user?.id, user?.companyId, dispatch]);
 
   // --- ACTIONS ---
   const handleMarkAllRead = () => {
-    setInternalNotifications((prev) =>
-      prev.map((n) => ({ ...n, unread: false }))
-    );
+    if (user?.id) {
+      // If filtering by intent, only mark those? 
+      // Current backend API supports marking specific IDs or ALL.
+      // For simplicity/safety, we'll mark displayed ones if possible, or just all.
+      // Let's stick to marking all for now or displayed IDs.
+      const idsToMark = filteredNotifications.filter(n => n.unread).map(n => n.id);
+      if (idsToMark.length > 0) {
+        dispatch(markAsReadThunk({
+          userId: user.id,
+          notificationIds: idsToMark
+        }));
+      }
+    }
   };
 
   const handleMarkRead = (id, e) => {
     if (e) e.stopPropagation();
-    setInternalNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, unread: false } : n))
-    );
+    if (user?.id) {
+      dispatch(markAsReadThunk({
+        userId: user.id,
+        notificationIds: [id]
+      }));
+    }
   };
 
   const handleDelete = (id, e) => {
     if (e) e.stopPropagation();
-    setInternalNotifications((prev) => prev.filter((n) => n.id !== id));
+    handleMarkRead(id, e);
     if (activeNotif?.id === id) setActiveNotif(null);
   };
 
-  const handleClearAll = () => {
-    if (window.confirm("Are you sure you want to clear all notifications?")) {
-      setInternalNotifications([]);
+  const handleAction = (n, e) => {
+    if (e) e.stopPropagation();
+    if (n.actionUrl) {
+      handleMarkRead(n.id); // Auto-read on interaction
+      onClose();
+      router.push(n.actionUrl);
+    } else {
+      setActiveNotif(n);
     }
   };
 
+  // --- FILTERING ---
   const filteredNotifications = useMemo(() => {
-    if (filter === "unread") {
-      return internalNotifications.filter((n) => n.unread);
+    let filtered = notifications;
+
+    // 1. Filter by Intent Tab
+    const currentTab = IntentTabs.find(t => t.key === activeTab);
+    if (currentTab && currentTab.intent) {
+      filtered = filterByIntent(filtered, currentTab.intent);
     }
-    return internalNotifications;
-  }, [internalNotifications, filter]);
 
-  const unreadCount = internalNotifications.filter((n) => n.unread).length;
+    // 2. Filter by Unread Toggle
+    if (showUnreadOnly) {
+      filtered = filtered.filter(n => n.unread);
+    }
 
-  // --- FORMATTING ---
-  const formatTime = (dateInput) => {
-    if (!dateInput) return "";
-    const date = new Date(dateInput);
-    if (isNaN(date.getTime())) return ""; // Handle invalid date
+    return filtered;
+  }, [notifications, activeTab, showUnreadOnly]);
 
-    const now = new Date();
-    const diff = now - date;
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(minutes / 60);
-    const days = Math.floor(hours / 24);
-
-    if (minutes < 1) return "Just now";
-    if (minutes < 60) return `${minutes}m ago`;
-    if (hours < 24) return `${hours}h ago`;
-    if (days < 7) return `${days}d ago`;
-    return date.toLocaleDateString();
-  };
-
-  // --- ICONS ---
-  const getTypeIcon = (n) => {
-    if (n.icon) return n.icon;
-    if (n.type === "order")
-      return <Package className="w-5 h-5 text-purple-500" />;
-    if (n.type === "system")
-      return <Calendar className="w-5 h-5 text-blue-500" />;
-    if (n.type === "alert")
-      return <AlertTriangle className="w-5 h-5 text-red-500" />;
-    return <Bell className="w-5 h-5 text-gray-500" />;
+  // --- RENDER HELPERS ---
+  const renderIcon = (iconName, className) => {
+    const IconComponent = IconMap[iconName] || Bell;
+    return <IconComponent className={className} />;
   };
 
   return (
@@ -188,290 +161,213 @@ function NotificationSideBar({
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
-<<<<<<< HEAD
-            transition={{ duration: 0.35, ease: "easeInOut" }}
-            className="fixed top-0 right-0 w-full sm:w-96 md:w-96 h-full bg-white shadow-lg z-50 flex flex-col rounded-l-lg"
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between p-5 border-b flex-shrink-0">
-              <div className="flex items-center gap-2">
-                <h2 className="text-lg font-semibold">Notifications</h2>
-                {unreadCount > 0 && (
-                  <span className="text-xs bg-red-500 text-white px-2 py-0.5 rounded-full">
-                    {unreadCount}
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-3">
-                {unreadCount > 0 && (
-                  <button
-                    className="text-xs text-orange-500 hover:text-orange-600 font-medium"
-                    onClick={() => onMarkAll()}
-                    title="Mark all as read"
-                  >
-                    Mark all read
-                  </button>
-                )}
-                <button onClick={() => onClose()}>
-                  <X className="w-6 h-6 text-gray-600 hover:text-orange-500" />
-=======
             transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className="fixed top-0 right-0 w-full sm:w-[420px] h-[100dvh] bg-white shadow-2xl z-[60] flex flex-col font-sans"
+            className="fixed top-0 right-0 w-full sm:w-[480px] h-[100dvh] bg-white shadow-2xl z-[60] flex flex-col font-sans border-l border-gray-100"
           >
             {/* Header */}
-            <div className="flex flex-col border-b border-gray-100 bg-white z-10">
+            <div className="flex flex-col bg-white z-10 border-b border-gray-100">
               <div className="flex items-center justify-between px-6 py-5">
                 <div className="flex items-center gap-3">
-                  <div className="relative bg-orange-100 p-4 rounded-full">
-                    <Bell className="w-6 h-6 text-orange-500 " />
+                  <div className="relative bg-orange-50 p-3 rounded-xl border border-orange-100">
+                    <Bell className="w-6 h-6 text-orange-600" />
                     {unreadCount > 0 && (
                       <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white" />
                     )}
                   </div>
                   <div>
                     <h2 className="text-xl font-bold text-gray-900 tracking-tight">
-                      Notifications
+                      Inbox
                     </h2>
-                    <p className="text-xs text-gray-500 font-medium">
-                      You have {unreadCount} unread messages
+                    <p className="text-xs text-gray-500 font-medium mt-0.5">
+                      {unreadCount} unread messages
                     </p>
                   </div>
                 </div>
-                <button
-                  onClick={onClose}
-                  className="p-2 rounded-full hover:bg-gray-100 transition-colors"
-                >
-                  <X className="w-5 h-5 text-gray-500" />
->>>>>>> 10c61ac9eef67dfebaa502362d59231ecad47fe9
-                </button>
-              </div>
-
-              {/* Tabs & Actions */}
-              <div className="flex items-center justify-between px-6 pb-4">
-                <div className="flex items-center bg-gray-100/80 p-1 rounded-lg">
+                <div className="flex items-center gap-2">
                   <button
-                    onClick={() => setFilter("all")}
-                    className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${
-                      filter === "all"
-                        ? "bg-white text-gray-900 shadow-sm"
-                        : "text-gray-500 hover:text-gray-700"
-                    }`}
+                    onClick={() => setShowUnreadOnly(!showUnreadOnly)}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all border ${showUnreadOnly
+                        ? "bg-blue-50 text-blue-700 border-blue-200"
+                        : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
+                      }`}
                   >
-                    All
+                    Unread only
                   </button>
                   <button
-                    onClick={() => setFilter("unread")}
-                    className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${
-                      filter === "unread"
-                        ? "bg-white text-gray-900 shadow-sm"
-                        : "text-gray-500 hover:text-gray-700"
-                    }`}
+                    onClick={onClose}
+                    className="p-2 rounded-full hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600"
                   >
-                    Unread
+                    <X className="w-5 h-5" />
                   </button>
                 </div>
+              </div>
 
-                <div className="flex items-center gap-1">
-                  {internalNotifications.length > 0 && (
-                    <button
-                      onClick={handleMarkAllRead}
-                      className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
-                      title="Mark all as read"
-                    >
-                      <CheckCircle className="w-4 h-4" />
-                    </button>
-                  )}
-                  {internalNotifications.length > 0 && (
-                    <button
-                      onClick={handleClearAll}
-                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
-                      title="Clear all"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  )}
+              {/* Intent Tabs */}
+              <div className="px-6 pb-0 overflow-x-auto no-scrollbar">
+                <div className="flex gap-6 border-b border-gray-100">
+                  {IntentTabs.map((tab) => {
+                    const isActive = activeTab === tab.key;
+                    const Icon = IconMap[tab.icon];
+                    return (
+                      <button
+                        key={tab.key}
+                        onClick={() => setActiveTab(tab.key)}
+                        className={`pb-3 flex items-center gap-2 text-sm font-medium transition-all relative ${isActive
+                            ? "text-gray-900"
+                            : "text-gray-400 hover:text-gray-600"
+                          }`}
+                      >
+                        <Icon className={`w-4 h-4 ${isActive ? "text-orange-500" : ""}`} />
+                        {tab.label}
+                        {isActive && (
+                          <motion.div
+                            layoutId="activeTab"
+                            className="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-500 rounded-t-full"
+                          />
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             </div>
 
-<<<<<<< HEAD
-            {/* Notifications List */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
-              {loading ? (
-                <div className="flex flex-col items-center justify-center py-12">
-                  <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
-                  <p className="text-sm text-gray-500 mt-2">
-                    Loading notifications...
-                  </p>
-                </div>
-              ) : notifications.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12">
-                  <BellOff className="w-12 h-12 text-gray-300" />
-                  <p className="text-sm text-gray-500 mt-2">
-                    No notifications yet
-                  </p>
-                </div>
-              ) : (
-                notifications.map((n) => (
-                  <div
-                    key={n.id}
-                    className={`flex items-start gap-3 p-3 rounded-lg transition relative cursor-pointer ${
-                      n.unread
-                        ? "bg-orange-50 border border-orange-100"
-                        : "bg-white border border-gray-200 hover:bg-gray-50"
-                    }`}
-                    onClick={() => {
-                      if (n.unread) onMarkRead(n.id);
-                      setActiveNotif(n);
-                    }}
-                  >
-                    <div
-                      className={`w-10 h-10 ${getTypeColor(
-                        n.type
-                      )} rounded-lg flex items-center justify-center text-white font-bold flex-shrink-0`}
-                    >
-                      <span>{n.title?.charAt(0)?.toUpperCase() ?? "N"}</span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-semibold text-sm truncate">
-                          {n.title}
-                        </h4>
-                        {n.unread && (
-                          <span className="text-[10px] bg-orange-500 text-white px-1.5 py-0.5 rounded-full flex-shrink-0">
-                            NEW
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-gray-500 line-clamp-2">
-                        {n.desc}
-                      </p>
-                      <span className="text-[10px] text-gray-400 mt-1 block">
-                        {n.time}
-                      </span>
-                    </div>
-                  </div>
-                ))
-              )}
-=======
             {/* List */}
-            <div className="flex-1 overflow-y-auto bg-gray-50/30 p-4 space-y-3">
-              {filteredNotifications.length === 0 ? (
+            <div className="flex-1 overflow-y-auto bg-gray-50/50 p-4 space-y-3">
+              {/* Toolbar */}
+              {notifications.length > 0 && (
+                <div className="flex justify-end px-2 mb-2">
+                  <button
+                    onClick={handleMarkAllRead}
+                    className="text-xs font-medium text-gray-400 hover:text-orange-600 flex items-center gap-1.5 transition-colors"
+                  >
+                    <CheckCircle className="w-3.5 h-3.5" />
+                    Mark visible as read
+                  </button>
+                </div>
+              )}
+
+              {loading && notifications.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-gray-400">
-                  <Bell className="w-12 h-12 mb-3 opacity-20" />
-                  <p className="text-sm font-medium">No notifications found</p>
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mb-3"></div>
+                  <p className="text-sm font-medium">Loading...</p>
+                </div>
+              ) : filteredNotifications.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-gray-400 p-8 text-center">
+                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                    {renderIcon(IntentTabs.find(t => t.key === activeTab)?.icon || 'Bell', "w-8 h-8 text-gray-300")}
+                  </div>
+                  <p className="text-sm font-medium text-gray-900">No notifications found</p>
+                  <p className="text-xs text-gray-500 mt-1 max-w-[200px]">
+                    {showUnreadOnly
+                      ? "You have no unread messages in this category."
+                      : "You're all caught up! No notifications to display."}
+                  </p>
+                  {showUnreadOnly && (
+                    <button
+                      onClick={() => setShowUnreadOnly(false)}
+                      className="mt-4 text-orange-600 text-xs font-bold hover:underline"
+                    >
+                      View all notifications
+                    </button>
+                  )}
                 </div>
               ) : (
-                filteredNotifications.map((n) => (
-                  <motion.div
-                    layout
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    key={n.id}
-                    onClick={() => {
-                      handleMarkRead(n.id);
-                      setActiveNotif(n);
-                    }}
-                    className={`group relative flex gap-4 p-4 rounded-xl cursor-pointer transition-all border ${
-                      n.unread
-                        ? "bg-white border-blue-100 shadow-sm hover:shadow-md"
-                        : "bg-white/60 border-gray-100 hover:bg-white hover:shadow-sm"
-                    }`}
-                  >
-                    {/* Icon/Avatar */}
-                    <div className="flex-shrink-0">
-                      {n.avatar ? (
-                        <div className="relative">
-                          <img
-                            src={n.avatar}
-                            alt="Avatar"
-                            className="w-10 h-10 rounded-full object-cover border border-gray-100 shadow-sm"
-                          />
-                          {n.unread && (
-                            <span className="absolute bottom-0 right-0 w-3 h-3 bg-blue-500 border-2 border-white rounded-full"></span>
+                filteredNotifications.map((n) => {
+                  const intentUI = getIntentUI(n.intent);
+                  const priorityStyle = getPriorityStyle(n.priority);
+
+                  return (
+                    <motion.div
+                      layout
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      key={n.id}
+                      onClick={(e) => handleAction(n, e)}
+                      className={`group relative flex gap-4 p-4 rounded-xl cursor-pointer transition-all border
+                        ${n.unread ? "bg-white shadow-sm hover:shadow-md" : "bg-white/40 hover:bg-white border-transparent hover:shadow-sm"}
+                        ${priorityStyle.highlight && n.unread ? "border-l-4 " + intentUI.borderClass.replace('border', 'border-l') : "border-gray-100"}
+                      `}
+                    >
+                      {/* Priority Pulse */}
+                      {priorityStyle.pulse && n.unread && (
+                        <span className="absolute top-4 right-4 flex h-2.5 w-2.5">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+                        </span>
+                      )}
+
+                      {/* Icon */}
+                      <div className="flex-shrink-0 pt-1">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${n.unread ? intentUI.bgClass : 'bg-gray-100'}`}>
+                          {renderIcon(intentUI.icon, `w-5 h-5 ${n.unread ? intentUI.textClass : 'text-gray-400'}`)}
+                        </div>
+                      </div>
+
+                      {/* Content */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <h4 className={`text-sm pr-6 leading-tight ${n.unread ? "font-bold text-gray-900" : "font-semibold text-gray-600"}`}>
+                            {n.title}
+                          </h4>
+                        </div>
+                        <p className={`text-xs leading-relaxed mb-2 ${n.unread ? "text-gray-600" : "text-gray-500"}`}>
+                          {n.desc}
+                        </p>
+
+                        <div className="flex items-center gap-3">
+                          <span className="text-[10px] text-gray-400 font-medium flex items-center gap-1">
+                            {n.time}
+                          </span>
+                          {n.intent && (
+                            <span className={`text-[9px] px-1.5 py-0.5 rounded-md uppercase tracking-wider font-bold ${intentUI.bgClass} ${intentUI.textClass} bg-opacity-50`}>
+                              {intentUI.label}
+                            </span>
                           )}
                         </div>
-                      ) : (
-                        <div
-                          className={`w-10 h-10 rounded-full flex items-center justify-center shadow-sm border border-gray-100 ${
-                            n.unread ? "bg-blue-50" : "bg-gray-50"
-                          }`}
-                        >
-                          {getTypeIcon(n)}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Content */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2 mb-1">
-                        <h4
-                          className={`text-sm truncate pr-4 ${
-                            n.unread
-                              ? "font-bold text-gray-900"
-                              : "font-semibold text-gray-700"
-                          }`}
-                        >
-                          {n.title}
-                        </h4>
-                        <span className="text-[10px] text-gray-400 whitespace-nowrap flex-shrink-0">
-                          {formatTime(n.time)}
-                        </span>
                       </div>
-                      <p
-                        className={`text-xs line-clamp-2 leading-relaxed ${
-                          n.unread
-                            ? "text-gray-600 font-medium"
-                            : "text-gray-500"
-                        }`}
-                      >
-                        {n.desc}
-                      </p>
-                    </div>
 
-                    {/* Hover Actions */}
-                    <div className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col gap-1">
-                      {n.unread && (
+                      {/* Hover Actions */}
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col gap-1 bg-white/80 backdrop-blur-sm p-1 rounded-lg">
+                        {n.actionUrl && (
+                          <div className="p-1.5 text-blue-600 rounded-lg hover:bg-blue-50">
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </div>
+                        )}
+                        {n.unread && (
+                          <button
+                            onClick={(e) => handleMarkRead(n.id, e)}
+                            className="p-1.5 text-blue-600 rounded-lg hover:bg-blue-50"
+                            title="Mark as read"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                         <button
-                          onClick={(e) => handleMarkRead(n.id, e)}
-                          className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 shadow-sm"
-                          title="Mark as read"
+                          onClick={(e) => handleDelete(n.id, e)}
+                          className="p-1.5 text-red-600 rounded-lg hover:bg-red-50"
+                          title="Delete"
                         >
-                          <Check className="w-3 h-3" />
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
-                      )}
-                      <button
-                        onClick={(e) => handleDelete(n.id, e)}
-                        className="p-1.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 shadow-sm"
-                        title="Delete"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-                    </div>
-                  </motion.div>
-                ))
+                      </div>
+                    </motion.div>
+                  );
+                })
               )}
             </div>
 
             {/* Footer */}
-            <div className="p-4 border-t border-gray-100 bg-gray-50 flex justify-center text-xs text-gray-400 font-medium">
-              Showing last 30 days
->>>>>>> 10c61ac9eef67dfebaa502362d59231ecad47fe9
+            <div className="p-4 border-t border-gray-100 bg-white">
+              <Link
+                href="/notifications"
+                className="flex items-center justify-center w-full py-2.5 bg-gray-900 text-white text-sm font-semibold rounded-xl hover:bg-gray-800 transition-all shadow-lg shadow-gray-200"
+                onClick={() => onClose()}
+              >
+                View Full Inbox
+              </Link>
             </div>
-
-            {/* Footer - View All Link */}
-            {notifications.length > 0 && (
-              <div className="border-t p-4 flex-shrink-0">
-                <Link
-                  href="/notifications"
-                  className="block text-center text-sm text-orange-500 hover:text-orange-600 font-medium"
-                  onClick={() => onClose()}
-                >
-                  View all notifications
-                </Link>
-              </div>
-            )}
           </motion.div>
 
           {/* Details Modal */}
@@ -491,59 +387,50 @@ function NotificationSideBar({
                   className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden relative"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  {/* Modal Header */}
-                  <div className="bg-gray-50 px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`p-2 rounded-full ${
-                          activeNotif.type === "alert"
-                            ? "bg-red-50"
-                            : "bg-blue-50"
-                        }`}
-                      >
-                        {getTypeIcon(activeNotif)}
-                      </div>
-                      <div>
-                        <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block">
-                          {activeNotif.type}
-                        </span>
-                        <span className="text-xs text-gray-500">
-                          {activeNotif.time?.toLocaleString()}
-                        </span>
-                      </div>
+                  <div className={`px-6 py-6 border-b border-gray-100 flex items-start gap-4 ${getIntentUI(activeNotif.intent).bgClass} bg-opacity-30`}>
+                    <div className={`p-3 rounded-full ${getIntentUI(activeNotif.intent).bgClass}`}>
+                      {renderIcon(getIntentUI(activeNotif.intent).icon, `w-6 h-6 ${getIntentUI(activeNotif.intent).textClass}`)}
+                    </div>
+                    <div className="flex-1">
+                      <span className={`text-xs font-bold uppercase tracking-wider ${getIntentUI(activeNotif.intent).textClass}`}>
+                        {getIntentUI(activeNotif.intent).label}
+                      </span>
+                      <h2 className="text-lg font-bold text-gray-900 leading-tight mt-1">
+                        {activeNotif.title}
+                      </h2>
                     </div>
                     <button
                       onClick={() => setActiveNotif(null)}
-                      className="p-2 bg-white rounded-full shadow-sm hover:bg-gray-100 text-gray-400 hover:text-gray-600"
+                      className="p-1 rounded-full hover:bg-black/5 text-gray-400 hover:text-gray-600 bg-white/50"
                     >
-                      <X className="w-4 h-4" />
+                      <X className="w-5 h-5" />
                     </button>
                   </div>
 
-                  {/* Modal Body */}
                   <div className="p-6">
-                    <h2 className="text-lg font-bold text-gray-900 mb-3">
-                      {activeNotif.title}
-                    </h2>
-                    <p className="text-sm text-gray-600 leading-relaxed mb-6">
+                    <p className="text-sm text-gray-600 leading-loose mb-6">
                       {activeNotif.full || activeNotif.desc}
                     </p>
+
+                    {activeNotif.actionUrl && (
+                      <button
+                        onClick={() => {
+                          handleMarkRead(activeNotif.id);
+                          onClose();
+                          router.push(activeNotif.actionUrl);
+                        }}
+                        className="w-full mb-3 py-3 bg-orange-500 text-white text-sm font-bold rounded-xl hover:bg-orange-600 transition-colors shadow-lg shadow-orange-100 flex items-center justify-center gap-2"
+                      >
+                        Take Action <ExternalLink className="w-4 h-4" />
+                      </button>
+                    )}
 
                     <div className="flex gap-3">
                       <button
                         onClick={() => setActiveNotif(null)}
-                        className="flex-1 px-4 py-2.5 bg-gray-900 text-white text-sm font-semibold rounded-xl hover:bg-gray-800 transition-colors shadow-lg shadow-gray-200"
+                        className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 text-sm font-semibold rounded-xl hover:bg-gray-200 transition-colors"
                       >
                         Close
-                      </button>
-                      <button
-                        onClick={() => {
-                          handleDelete(activeNotif.id);
-                          setActiveNotif(null);
-                        }}
-                        className="px-4 py-2.5 bg-white text-red-600 border border-gray-200 text-sm font-semibold rounded-xl hover:bg-red-50 hover:border-red-100 transition-colors"
-                      >
-                        Delete
                       </button>
                     </div>
                   </div>

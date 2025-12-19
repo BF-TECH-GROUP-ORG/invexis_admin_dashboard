@@ -74,6 +74,12 @@ export const fetchUnreadCount = async (userId, options = {}) => {
 
 /**
  * Transform backend notification to frontend format
+ * 
+ * Intent-Based Architecture:
+ * - Prefers compiledContent.inApp for rich content
+ * - Extracts intent and priority from payload
+ * - Includes actionUrl for click-through navigation
+ * 
  * @param {object} notification - Backend notification object
  * @param {string} userId - Current user ID
  * @returns {object} Formatted notification for UI
@@ -81,19 +87,44 @@ export const fetchUnreadCount = async (userId, options = {}) => {
 export const transformNotification = (notification, userId) => {
   const isUnread = !notification.readBy?.includes(userId);
 
+  // Extract rich content from compiledContent.inApp (preferred) or fallback to legacy fields
+  const inApp = notification.compiledContent?.inApp || {};
+  const payload = notification.payload || {};
+
   return {
     id: notification._id || notification.id,
-    title: notification.title || "Notification",
-    desc: notification.message || notification.description || "",
-    full: notification.fullMessage || notification.message || notification.description || "",
+
+    // Prefer compiledContent.inApp over legacy title/body
+    title: inApp.title || notification.title || "Notification",
+    desc: inApp.body || notification.body || notification.message || notification.description || "",
+    full: inApp.body || notification.fullMessage || notification.message || notification.description || "",
+
+    // Time formatting
     time: formatTimeAgo(notification.createdAt),
     createdAt: notification.createdAt,
+
+    // Read state
     unread: isUnread,
     read: !isUnread,
+
+    // Legacy type (for backward compatibility)
     type: notification.type || "general",
-    companyId: notification.companyId,
-    shopId: notification.shopId,
-    data: notification.data || {},
+
+    // Intent-Based fields (NEW)
+    intent: payload.intent || 'operational',
+    priority: notification.priority || 'normal',
+    role: payload.role || null,
+    eventType: payload.eventType || null,
+    source: payload.source || null,
+
+    // Actionable notification support
+    actionUrl: inApp.actionUrl || null,
+    imageUrl: inApp.imageUrl || null,
+
+    // Context data
+    companyId: payload.companyId || notification.companyId,
+    shopId: payload.shopId || notification.shopId,
+    data: inApp.data || notification.data || {},
   };
 };
 

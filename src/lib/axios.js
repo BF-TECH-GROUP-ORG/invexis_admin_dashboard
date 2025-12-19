@@ -3,7 +3,8 @@ import { getSession } from "next-auth/react";
 import { notificationBus } from "./notificationBus";
 
 // Use NEXT_PUBLIC_API_BASE_URL when available, otherwise use local proxy
-const DEFAULT_BASE = "https://granitic-jule-haunting.ngrok-free.dev/api";
+// Use NEXT_PUBLIC_API_BASE_URL when available, otherwise use local proxy
+const DEFAULT_BASE = "http://localhost:8000/api";
 const baseURL = (process.env.NEXT_PUBLIC_API_URL || DEFAULT_BASE).replace(
   /\/$/,
   ""

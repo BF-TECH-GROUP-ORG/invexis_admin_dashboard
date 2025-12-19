@@ -7,19 +7,28 @@
 import { io } from "socket.io-client";
 
 // WebSocket service URL - defaults to port 9002
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "http://localhost:9002";
+// WebSocket service URL - defaults to port 9002
+const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:9002";
 
 /**
  * Create a Socket.IO connection
  * @param {string} token - JWT authentication token
+ * @param {string} userId - User ID (Required for room joining)
  * @param {object} options - Additional Socket.IO options
  * @returns {object} Socket.IO client instance
  */
-export const createSocketConnection = (token, options = {}) => {
+export const createSocketConnection = (token, userId, options = {}) => {
+  // Return null if WebSocket URL is not configured
+  if (!WS_URL) {
+    console.warn("WebSocket service is disabled - no server URL configured");
+    return null;
+  }
+
   const defaultOptions = {
     path: "/socket.io",
     auth: {
       token: token,
+      userId: userId, // Critical for joining user room
     },
     reconnection: true,
     reconnectionDelay: 1000,

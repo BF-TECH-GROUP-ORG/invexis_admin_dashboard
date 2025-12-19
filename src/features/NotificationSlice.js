@@ -162,5 +162,45 @@ export const selectUnreadCount = (state) => state.notifications.unreadCount;
 export const selectNotificationsLoading = (state) => state.notifications.loading;
 export const selectNotificationsError = (state) => state.notifications.error;
 
+// Intent-based selectors
+export const selectNotificationsByIntent = (intent) => (state) =>
+  intent
+    ? state.notifications.notifications.filter(n => n.intent === intent)
+    : state.notifications.notifications;
+
+// Role-based selectors
+export const selectNotificationsByRole = (role) => (state) =>
+  role
+    ? state.notifications.notifications.filter(n => n.role === role)
+    : state.notifications.notifications;
+
+// Priority-based selectors
+export const selectUrgentNotifications = (state) =>
+  state.notifications.notifications.filter(n => n.priority === 'urgent' && n.unread);
+
+export const selectHighPriorityNotifications = (state) =>
+  state.notifications.notifications.filter(n =>
+    (n.priority === 'urgent' || n.priority === 'high') && n.unread
+  );
+
+// Combined filter selector (intent + read state)
+export const selectFilteredNotifications = (intent, readState) => (state) => {
+  let filtered = state.notifications.notifications;
+
+  // Filter by intent
+  if (intent) {
+    filtered = filtered.filter(n => n.intent === intent);
+  }
+
+  // Filter by read state
+  if (readState === 'unread') {
+    filtered = filtered.filter(n => n.unread);
+  } else if (readState === 'read') {
+    filtered = filtered.filter(n => !n.unread);
+  }
+
+  return filtered;
+};
+
 export default notificationSlice.reducer;
 

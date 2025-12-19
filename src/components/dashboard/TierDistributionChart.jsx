@@ -24,9 +24,21 @@ const CustomTooltip = ({ active, payload, total }) => {
   return null;
 };
 
-export default function TierDistributionChart({ data }) {
+export default function TierDistributionChart({ data = [] }) {
+  if (!data || data.length === 0) {
+    return (
+      <div className="p-6 rounded-xl border border-neutral-300 bg-white">
+        <h2 className="text-lg font-semibold mb-1">Tier Distribution</h2>
+        <p className="text-sm text-neutral-500 mb-4">INVEXIS tier breakdown</p>
+        <div className="w-full h-72 flex items-center justify-center">
+          <p className="text-neutral-400 text-sm">No tier data available</p>
+        </div>
+      </div>
+    );
+  }
+
   // Calculate total for percentage calculation
-  const total = data.reduce((sum, item) => sum + item.value, 0);
+  const total = data.reduce((sum, item) => sum + (item.value || 0), 0);
 
   return (
     <div className="p-6 rounded-xl border border-neutral-300 bg-white">
@@ -78,10 +90,10 @@ export default function TierDistributionChart({ data }) {
             </div>
             <div className="flex items-center gap-4">
               <span className="font-semibold text-neutral-900">
-                {tier.value}
+                {tier.value || 0}
               </span>
               <span className="text-neutral-500">
-                ({((tier.value / total) * 100).toFixed(1)}%)
+                ({total > 0 ? (((tier.value || 0) / total) * 100).toFixed(1) : 0}%)
               </span>
             </div>
           </div>

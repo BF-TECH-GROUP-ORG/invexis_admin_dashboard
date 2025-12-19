@@ -76,10 +76,27 @@ export default function TopNavBar({ expanded = true }) {
     const handleNewNotification = (notification) => {
       console.log("[NavBar] New notification received:", notification);
       dispatch(addNotification({ notification, userId: user.id }));
-      // Show toast notification
+
+      // Extract Semantic Data
+      const payload = notification.payload || {};
+      const intent = payload.intent || notification.intent || 'operational';
+      const priority = notification.priority || 'normal';
+
+      // Map Intent to Toast Severity
+      const severityMap = {
+        operational: 'info',
+        financial: 'success',
+        risk_security: 'error',
+        strategic_insight: 'info', // or a custom 'primary' if supported, else 'info'
+        accountability: 'warning'
+      };
+
+      // Show toast notification with semantic styling
       showNotification({
         message: notification.title || "New notification",
-        severity: "info",
+        description: notification.body || "", // If supported by toast, otherwise just message
+        severity: severityMap[intent] || 'info',
+        duration: priority === 'urgent' ? 10000 : 3000
       });
     };
 

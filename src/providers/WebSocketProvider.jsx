@@ -58,7 +58,14 @@ export function WebSocketProvider({ children }) {
 
       console.log("[WebSocket] Initializing connection...");
       dispatch(setConnecting());
-      const newSocket = createSocketConnection(session.accessToken);
+      const newSocket = createSocketConnection(session.accessToken, session.user?.id);
+
+      // If socket is null (disabled), don't proceed with connection setup
+      if (!newSocket) {
+        console.log("[WebSocket] Service disabled - skipping connection");
+        dispatch(setDisconnected());
+        return;
+      }
 
       // Track connection status
       newSocket.on("connect", () => {
