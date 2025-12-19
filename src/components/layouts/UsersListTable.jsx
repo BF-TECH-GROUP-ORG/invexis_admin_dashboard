@@ -378,7 +378,7 @@ export default function UsersListTable() {
                           />
                         </TableCell>
 
-                        <TableCell>
+                        {/* <TableCell>
                           <Typography variant="body2">
                             {u.position || "-"}
                           </Typography>
@@ -390,7 +390,7 @@ export default function UsersListTable() {
                               {u.department.replace("_", " ")}
                             </Typography>
                           )}
-                        </TableCell>
+                        </TableCell> */}
 
                         <TableCell>
                           <Typography
