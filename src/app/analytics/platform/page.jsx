@@ -36,7 +36,10 @@ export default function PlatformAnalyticsPage() {
         setLoading(true);
         setError(null);
 
-        const filters = { period };
+        const filters = {
+          period,
+          interval: period === "24h" ? "hour" : "day"
+        };
 
         const [statusRes, tierRes, topRes] = await Promise.allSettled([
           getCompanyStatus(filters),
@@ -69,10 +72,24 @@ export default function PlatformAnalyticsPage() {
   return (
     <div className="w-full">
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold mb-2">Platform Health & Overview</h1>
-        <p className="text-neutral-600">
-          Executive dashboard for platform-wide metrics
-        </p>
+        <div className="flex items-center justify-between mb-2">
+          <div>
+            <h1 className="text-2xl font-semibold mb-2">Platform Health & Overview</h1>
+            <p className="text-neutral-600">
+              Executive dashboard for platform-wide metrics
+            </p>
+          </div>
+          <select
+            value={period}
+            onChange={(e) => setPeriod(e.target.value)}
+            className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-orange-500"
+          >
+            <option value="24h">Last 24 Hours</option>
+            <option value="7d">Last 7 Days</option>
+            <option value="30d">Last 30 Days</option>
+            <option value="1y">Last Year</option>
+          </select>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">

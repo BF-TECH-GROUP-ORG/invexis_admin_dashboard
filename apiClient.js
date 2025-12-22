@@ -74,24 +74,26 @@ function setCachedResponse(key, data, ttl) {
  * Transform API errors to consistent format
  */
 function transformError(error) {
+  // If the error is already normalized by the bottom-layer axios instance
+  if (error && error.status !== undefined && error.message) {
+    return error;
+  }
+
   if (error.response) {
-    // Server responded with error status
     return {
       message: error.response.data?.message || error.message,
       status: error.response.status,
       data: error.response.data,
     };
   } else if (error.request) {
-    // Request made but no response
     return {
-      message: "No response from server. Please check your connection.",
+      message: "Network Error: No response from server. Check CORS or Backend status.",
       status: 0,
       data: null,
     };
   } else {
-    // Error in request setup
     return {
-      message: error.message,
+      message: error.message || "Request setup failed",
       status: -1,
       data: null,
     };
@@ -172,9 +174,11 @@ apiClient.interceptors.response.use(
     return response;
   },
   (error) => {
-    // const transformedError = transformError(error);
-    // console.error("[API Error]", transformedError);
-    return Promise.reject(transformError);
+    const transformedError = transformError(error);
+    if (process.env.NODE_ENV === "development") {
+      console.error("[API Error Interceptor]", transformedError);
+    }
+    return Promise.reject(transformedError);
   }
 );
 

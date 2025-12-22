@@ -18,7 +18,7 @@ export default function SalesAnalyticsPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [period, setPeriod] = useState("30d");
-  
+
   // Data states - start empty, populate from backend only
   const [revenueData, setRevenueData] = useState([]);
   const [profitData, setProfitData] = useState([]);
@@ -109,7 +109,6 @@ export default function SalesAnalyticsPage() {
               <option value="24h">Last 24 Hours</option>
               <option value="7d">Last 7 Days</option>
               <option value="30d">Last 30 Days</option>
-              <option value="90d">Last 90 Days</option>
               <option value="1y">Last Year</option>
             </select>
           </div>

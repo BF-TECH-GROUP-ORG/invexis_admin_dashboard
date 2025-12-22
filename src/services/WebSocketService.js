@@ -1,61 +1,53 @@
 /**
  * Socket.IO Client Service
  * Provides utilities for frontend to connect to websocket service
- * WebSocket service runs on port 9002
  */
 
 import { io } from "socket.io-client";
 
-// WebSocket service URL - defaults to port 9002
-// WebSocket service URL - defaults to port 9002
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:9002";
-
 /**
- * Create a Socket.IO connection
+ * Create a Socket.IO connection through the gateway
+ * @param {string} gatewayUrl - Gateway URL (e.g., 'http://localhost:3000')
  * @param {string} token - JWT authentication token
- * @param {string} userId - User ID (Required for room joining)
  * @param {object} options - Additional Socket.IO options
  * @returns {object} Socket.IO client instance
  */
-export const createSocketConnection = (token, userId, options = {}) => {
-  // Return null if WebSocket URL is not configured
-  if (!WS_URL) {
-    console.warn("WebSocket service is disabled - no server URL configured");
-    return null;
-  }
-
+export const createSocketConnection = (gatewayUrl, token, userId, options = {}) => {
   const defaultOptions = {
-    path: "/socket.io",
+    path: '/socket.io',
     auth: {
       token: token,
-      userId: userId, // Critical for joining user room
+      userId: userId,
     },
     reconnection: true,
     reconnectionDelay: 1000,
     reconnectionDelayMax: 5000,
     reconnectionAttempts: 5,
-    transports: ["websocket"],
+    transports: ['polling', 'websocket'], // Supported transports (polling first for better compatibility)
+    extraHeaders: {
+      "ngrok-skip-browser-warning": "true", // Bypass ngrok browser warning
+    },
     ...options,
   };
 
-  const socket = io(WS_URL, defaultOptions);
+  // Resolve URL
+  let rawUrl = gatewayUrl || process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:9002";
 
-  // Connection event handlers
-  socket.on("connect", () => {
-    console.log("✅ Connected to WebSocket service");
-  });
+  // Sanitize URL to remove path/namespaces that might be inadvertently included (e.g. /api)
+  // This prevents 'Invalid namespace' errors if the user copy-pasted an API URL
+  let url = rawUrl;
+  try {
+    const parsed = new URL(rawUrl);
+    // Keep only origin (protocol + host + port), discard pathname (namespace)
+    url = parsed.origin;
+  } catch (e) {
+    console.warn("Invalid WebSocket URL format:", rawUrl);
+  }
 
-  socket.on("disconnect", (reason) => {
-    console.log("❌ Disconnected from WebSocket service:", reason);
-  });
+  const socket = io(url, defaultOptions);
 
-  socket.on("error", (error) => {
-    console.error("⚠️ WebSocket error:", error);
-  });
-
-  socket.on("connect_error", (error) => {
-    console.error("⚠️ Connection error:", error);
-  });
+  // Note: Connection event handlers are now managed by the consumer (WebSocketProvider)
+  // to avoid duplicate logging.
 
   return socket;
 };
@@ -68,7 +60,8 @@ export const createSocketConnection = (token, userId, options = {}) => {
 export const joinRooms = (socket, rooms) => {
   if (!socket) return;
   const roomList = Array.isArray(rooms) ? rooms : [rooms];
-  socket.emit("join", roomList);
+  console.log(`[WebSocket] 🟢 Joining room(s):`, roomList);
+  socket.emit('join_room', roomList);
 };
 
 /**
@@ -79,7 +72,8 @@ export const joinRooms = (socket, rooms) => {
 export const leaveRooms = (socket, rooms) => {
   if (!socket) return;
   const roomList = Array.isArray(rooms) ? rooms : [rooms];
-  socket.emit("leave", roomList);
+  console.log(`[WebSocket] 🔴 Leaving room(s):`, roomList);
+  socket.emit('leave_room', roomList);
 };
 
 /**
@@ -90,14 +84,27 @@ export const leaveRooms = (socket, rooms) => {
  */
 export const subscribeToUserEvents = (socket, userId, callback) => {
   if (!socket) return;
+  console.log(`[WebSocket] 🎧 Subscribing to user events for: ${userId}`);
   const userRoom = `user:${userId}`;
   joinRooms(socket, userRoom);
 
   // Listen to all user events
-  socket.on("user.registered", callback);
-  socket.on("user.login", callback);
-  socket.on("user.logout", callback);
-  socket.on("user.updated", callback);
+  socket.on('user.registered', (data) => {
+    console.log(`[WebSocket] 📩 Event 'user.registered':`, data);
+    callback(data);
+  });
+  socket.on('user.login', (data) => {
+    console.log(`[WebSocket] 📩 Event 'user.login':`, data);
+    callback(data);
+  });
+  socket.on('user.logout', (data) => {
+    console.log(`[WebSocket] 📩 Event 'user.logout':`, data);
+    callback(data);
+  });
+  socket.on('user.updated', (data) => {
+    console.log(`[WebSocket] 📩 Event 'user.updated':`, data);
+    callback(data);
+  });
 };
 
 /**
@@ -107,13 +114,14 @@ export const subscribeToUserEvents = (socket, userId, callback) => {
  */
 export const unsubscribeFromUserEvents = (socket, userId) => {
   if (!socket) return;
+  console.log(`[WebSocket] 🔇 Unsubscribing from user events: ${userId}`);
   const userRoom = `user:${userId}`;
   leaveRooms(socket, userRoom);
 
-  socket.off("user.registered");
-  socket.off("user.login");
-  socket.off("user.logout");
-  socket.off("user.updated");
+  socket.off('user.registered');
+  socket.off('user.login');
+  socket.off('user.logout');
+  socket.off('user.updated');
 };
 
 /**
@@ -124,12 +132,22 @@ export const unsubscribeFromUserEvents = (socket, userId) => {
  */
 export const subscribeToNotifications = (socket, userId, callback) => {
   if (!socket) return;
+  console.log(`[WebSocket] 🎧 Subscribing to notifications for: ${userId}`);
   const userRoom = `user:${userId}`;
   joinRooms(socket, userRoom);
 
-  socket.on("notification", callback);
-  socket.on("notification.read", callback);
-  socket.on("notification.deleted", callback);
+  socket.on('notification', (data) => {
+    console.log(`[WebSocket] 🔔 New Notification Received:`, data);
+    callback(data);
+  });
+  socket.on('notification.read', (data) => {
+    console.log(`[WebSocket] 📖 Notification Read:`, data);
+    callback(data); // You might want a separate callback or handle this differently in the provider
+  });
+  socket.on('notification.deleted', (data) => {
+    console.log(`[WebSocket] 🗑️ Notification Deleted:`, data);
+    callback(data);
+  });
 };
 
 /**
@@ -142,9 +160,9 @@ export const unsubscribeFromNotifications = (socket, userId) => {
   const userRoom = `user:${userId}`;
   leaveRooms(socket, userRoom);
 
-  socket.off("notification");
-  socket.off("notification.read");
-  socket.off("notification.deleted");
+  socket.off('notification');
+  socket.off('notification.read');
+  socket.off('notification.deleted');
 };
 
 /**

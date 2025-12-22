@@ -63,9 +63,9 @@ function NotificationSideBar({
 
   // Fetch notifications when sidebar opens
   useEffect(() => {
-    if (isOpen && user?.id) {
+    if (isOpen && user?._id) {
       dispatch(fetchNotificationsThunk({
-        userId: user.id,
+        userId: user._id,
         options: {
           companyId: user.companyId,
           limit: 50,
@@ -76,7 +76,7 @@ function NotificationSideBar({
 
   // --- ACTIONS ---
   const handleMarkAllRead = () => {
-    if (user?.id) {
+    if (user?._id) {
       // If filtering by intent, only mark those? 
       // Current backend API supports marking specific IDs or ALL.
       // For simplicity/safety, we'll mark displayed ones if possible, or just all.
@@ -84,7 +84,7 @@ function NotificationSideBar({
       const idsToMark = filteredNotifications.filter(n => n.unread).map(n => n.id);
       if (idsToMark.length > 0) {
         dispatch(markAsReadThunk({
-          userId: user.id,
+          userId: user._id,
           notificationIds: idsToMark
         }));
       }
@@ -93,9 +93,9 @@ function NotificationSideBar({
 
   const handleMarkRead = (id, e) => {
     if (e) e.stopPropagation();
-    if (user?.id) {
+    if (user?._id) {
       dispatch(markAsReadThunk({
-        userId: user.id,
+        userId: user._id,
         notificationIds: [id]
       }));
     }
@@ -187,8 +187,8 @@ function NotificationSideBar({
                   <button
                     onClick={() => setShowUnreadOnly(!showUnreadOnly)}
                     className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all border ${showUnreadOnly
-                        ? "bg-blue-50 text-blue-700 border-blue-200"
-                        : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
+                      ? "bg-blue-50 text-blue-700 border-blue-200"
+                      : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
                       }`}
                   >
                     Unread only
@@ -213,8 +213,8 @@ function NotificationSideBar({
                         key={tab.key}
                         onClick={() => setActiveTab(tab.key)}
                         className={`pb-3 flex items-center gap-2 text-sm font-medium transition-all relative ${isActive
-                            ? "text-gray-900"
-                            : "text-gray-400 hover:text-gray-600"
+                          ? "text-gray-900"
+                          : "text-gray-400 hover:text-gray-600"
                           }`}
                       >
                         <Icon className={`w-4 h-4 ${isActive ? "text-orange-500" : ""}`} />
@@ -283,7 +283,7 @@ function NotificationSideBar({
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, scale: 0.95 }}
-                      key={n.id}
+                      key={n.id || `notif-${index}`}
                       onClick={(e) => handleAction(n, e)}
                       className={`group relative flex gap-4 p-4 rounded-xl cursor-pointer transition-all border
                         ${n.unread ? "bg-white shadow-sm hover:shadow-md" : "bg-white/40 hover:bg-white border-transparent hover:shadow-sm"}

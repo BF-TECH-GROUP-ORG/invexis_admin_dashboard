@@ -62,10 +62,10 @@ const NotificationsPage = () => {
 
   // Fetch notifications
   const fetchData = useCallback(() => {
-    if (user?.id) {
+    if (user?._id) {
       dispatch(
         fetchNotificationsThunk({
-          userId: user.id,
+          userId: user._id,
           options: {
             companyId: user.companyId,
             unreadOnly: filterState === "unread",
@@ -75,7 +75,7 @@ const NotificationsPage = () => {
         })
       );
     }
-  }, [user?.id, user?.companyId, filterState, page, dispatch]);
+  }, [user?._id, user?.companyId, filterState, page, dispatch]);
 
   useEffect(() => {
     fetchData();
@@ -83,15 +83,15 @@ const NotificationsPage = () => {
 
   const handleMarkRead = (id, e) => {
     if (e) e.stopPropagation();
-    if (user?.id) {
-      dispatch(markAsReadThunk({ userId: user.id, notificationIds: [id] }));
+    if (user?._id) {
+      dispatch(markAsReadThunk({ userId: user._id, notificationIds: [id] }));
     }
   };
 
   const handleMarkAllRead = () => {
-    if (user?.id) {
+    if (user?._id) {
       // Logic could be improved to only mark filtered items
-      dispatch(markAllAsReadThunk({ userId: user.id }));
+      dispatch(markAllAsReadThunk({ userId: user._id }));
     }
   };
 
@@ -175,8 +175,8 @@ const NotificationsPage = () => {
                 key={f}
                 onClick={() => setFilterState(f)}
                 className={`w-full text-left px-4 py-3 rounded-xl text-sm font-semibold transition-all flex items-center justify-between ${filterState === f
-                    ? "bg-gray-50 text-orange-600"
-                    : "text-gray-500 hover:bg-gray-50/50 hover:text-gray-700"
+                  ? "bg-gray-50 text-orange-600"
+                  : "text-gray-500 hover:bg-gray-50/50 hover:text-gray-700"
                   }`}
               >
                 {f.charAt(0).toUpperCase() + f.slice(1)}
@@ -200,8 +200,8 @@ const NotificationsPage = () => {
                     key={tab.key}
                     onClick={() => setActiveTab(tab.key)}
                     className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${isActive
-                        ? "bg-orange-50 text-orange-700"
-                        : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                      ? "bg-orange-50 text-orange-700"
+                      : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                       }`}
                   >
                     <Icon className={`w-4 h-4 ${isActive ? "text-orange-500" : "text-gray-400"}`} />
@@ -268,8 +268,8 @@ const NotificationCard = ({ notification, onMarkRead, onAction, renderIcon }) =>
   return (
     <div
       className={`group relative p-5 rounded-2xl border transition-all cursor-pointer ${notification.unread
-          ? "bg-white shadow-sm hover:shadow-md border-gray-200"
-          : "bg-gray-50 border-gray-100 hover:bg-white hover:border-gray-200"
+        ? "bg-white shadow-sm hover:shadow-md border-gray-200"
+        : "bg-gray-50 border-gray-100 hover:bg-white hover:border-gray-200"
         } ${priorityStyle.highlight && notification.unread ? "ring-1 ring-inset " + priorityStyle.ringClass : ""}`}
       onClick={() => setExpanded(!expanded)}
     >

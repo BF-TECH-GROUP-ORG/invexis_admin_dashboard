@@ -32,6 +32,8 @@ import {
   setError,
   resetState,
 } from "@/features/WebSocketSlice";
+import { addNotification } from "@/features/NotificationSlice";
+import { notificationBus } from "@/lib/notificationBus";
 
 // Create WebSocket context
 const WebSocketContext = createContext(null);
@@ -58,7 +60,9 @@ export function WebSocketProvider({ children }) {
 
       console.log("[WebSocket] Initializing connection...");
       dispatch(setConnecting());
-      const newSocket = createSocketConnection(session.accessToken, session.user?.id);
+      // FIXED: Use session.user._id instead of .id
+      const newSocket = createSocketConnection(process.env.NEXT_PUBLIC_WS_URL, session.accessToken, session.user?._id);
+
 
       // If socket is null (disabled), don't proceed with connection setup
       if (!newSocket) {
@@ -117,41 +121,67 @@ export function WebSocketProvider({ children }) {
       setSocket(null);
       setConnectionStatus("disconnected");
     }
-  }, [status, session?.accessToken, dispatch]);
+  }, [status, session?.accessToken, session?.user?._id, dispatch]);
+
+  // Global Notification Subscription
+  useEffect(() => {
+    // FIXED: Use session.user._id
+    if (socket && session?.user?._id) {
+      console.log("[WebSocket] Subscribing to user notifications:", session.user._id);
+
+      const handleNotification = (data) => {
+        console.log("[WebSocket] Received notification:", data);
+        dispatch(addNotification({ notification: data, userId: session.user._id }));
+
+        // Also emit to the bus for toast
+        notificationBus.emit({
+          message: data.title || "New Notification",
+          severity: "info",
+          duration: 5000
+        });
+      };
+
+      subscribeToNotifications(socket, session.user._id, handleNotification);
+
+      return () => {
+        unsubscribeFromNotifications(socket, session.user._id);
+      };
+    }
+  }, [socket, session?.user?._id, dispatch]);
 
   // Helper to subscribe to notifications for current user
   const subscribeNotifications = useCallback(
     (callback) => {
-      if (socket && session?.user?.id) {
-        subscribeToNotifications(socket, session.user.id, callback);
+      if (socket && session?.user?._id) {
+        subscribeToNotifications(socket, session.user._id, callback);
       }
     },
-    [socket, session?.user?.id]
+    [socket, session?.user?._id]
   );
 
   // Helper to unsubscribe from notifications
   const unsubscribeNotifications = useCallback(() => {
-    if (socket && session?.user?.id) {
-      unsubscribeFromNotifications(socket, session.user.id);
+    if (socket && session?.user?._id) {
+      unsubscribeFromNotifications(socket, session.user._id);
     }
-  }, [socket, session?.user?.id]);
+  }, [socket, session?.user?._id]);
 
   // Helper to subscribe to user events
   const subscribeUserEvents = useCallback(
     (callback) => {
-      if (socket && session?.user?.id) {
-        subscribeToUserEvents(socket, session.user.id, callback);
+      if (socket && session?.user?._id) {
+        subscribeToUserEvents(socket, session.user._id, callback);
       }
     },
-    [socket, session?.user?.id]
+    [socket, session?.user?._id]
   );
 
   // Helper to unsubscribe from user events
   const unsubscribeUserEvents = useCallback(() => {
-    if (socket && session?.user?.id) {
-      unsubscribeFromUserEvents(socket, session.user.id);
+    if (socket && session?.user?._id) {
+      unsubscribeFromUserEvents(socket, session.user._id);
     }
-  }, [socket, session?.user?.id]);
+  }, [socket, session?.user?._id]);
 
   // Context value
   const value = {

@@ -11,8 +11,11 @@ export const fetchNotificationsThunk = createAsyncThunk(
   "notifications/fetch",
   async ({ userId, options = {} }, { rejectWithValue }) => {
     try {
-      const data = await fetchNotifications(userId, options);
-      return { notifications: data, userId };
+      const response = await fetchNotifications(userId, options);
+      // API returns { success: true, data: { notifications: [...] } }
+      // fetchNotifications returns response.data (the body)
+      const notifications = response.data?.notifications || [];
+      return { notifications, userId };
     } catch (error) {
       return rejectWithValue(error.response?.data?.error || error.message);
     }

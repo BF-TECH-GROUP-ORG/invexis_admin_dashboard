@@ -1,61 +1,81 @@
 import api from "@/lib/axios";
 
+const API_BASE = "/notification";
+
 /**
- * Fetch notifications for a user
- * @param {string} userId - User ID
- * @param {object} options - Query options
- * @param {string} options.companyId - Filter by company ID
- * @param {string} options.shopId - Filter by shop ID
- * @param {string} options.role - Filter by role
- * @param {boolean} options.unreadOnly - Only fetch unread notifications
- * @param {number} options.page - Page number (default: 1)
- * @param {number} options.limit - Items per page (default: 50)
- * @returns {Promise} Array of notifications
+ * Get User Notifications
+ * GET /api/notifications
+ * @param {Object} params
+ * @param {number} params.page - Page number (default: 1)
+ * @param {number} params.limit - Items per page (default: 50)
+ * @param {boolean} params.unreadOnly - Filter unread items
+ * @param {string} params.role - Filter by user role
+ * @param {string} params.companyId - Filter by company context
+ * @param {string} params.type - Filter by notification type
  */
+export async function getNotifications({ page = 1, limit = 10, unreadOnly, role, companyId, type } = {}) {
+  try {
+    const params = { page, limit };
+    if (unreadOnly !== undefined) params.unreadOnly = unreadOnly;
+    if (role) params.role = role;
+    if (companyId) params.companyId = companyId;
+    if (type) params.type = type;
+
+    const response = await api.get(API_BASE, { params });
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching notifications:", error);
+    throw error;
+  }
+}
+
+// Alias for backward compatibility (adapters for existing code)
 export const fetchNotifications = async (userId, options = {}) => {
-  const { companyId, shopId, role, unreadOnly = false, page = 1, limit = 50 } = options;
-
-  const params = new URLSearchParams();
-  if (companyId) params.append("companyId", companyId);
-  if (shopId) params.append("shopId", shopId);
-  if (role) params.append("role", role);
-  if (unreadOnly) params.append("unreadOnly", "true");
-  params.append("page", page.toString());
-  params.append("limit", limit.toString());
-
-  const queryString = params.toString();
-  const url = `/notification/${userId}${queryString ? `?${queryString}` : ""}`;
-
-  const response = await api.get(url);
-  return response.data;
+  return getNotifications(options);
 };
 
 /**
- * Mark specific notifications as read
- * @param {string} userId - User ID
- * @param {string[]} notificationIds - Array of notification IDs to mark as read
- * @returns {Promise} Result with updated count
+ * Mark Notifications as Read
+ * POST /api/notifications/mark-read
+ * @param {Object} payload
+ * @param {string[]} payload.notificationIds - Array of notification IDs
+ * @param {boolean} payload.all - Mark all as read
  */
+export async function markNotificationsRead({ notificationIds, all } = {}) {
+  try {
+    const response = await api.post(`${API_BASE}/mark-read`, {
+      notificationIds,
+      all,
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error marking notifications as read:", error);
+    throw error;
+  }
+}
+
+// Alias
 export const markNotificationsAsRead = async (userId, notificationIds) => {
-  const response = await api.post("/notification/mark-read", {
-    userId,
-    notificationIds,
-  });
-  return response.data;
+  return markNotificationsRead({ notificationIds });
+};
+
+export const markAllNotificationsAsRead = async (userId) => {
+  return markNotificationsRead({ all: true });
 };
 
 /**
- * Mark all notifications as read for a user
- * @param {string} userId - User ID
- * @returns {Promise} Result with updated count
+ * Create Notification (Admin / System Testing)
+ * POST /api/notifications
  */
-export const markAllNotificationsAsRead = async (userId) => {
-  const response = await api.post("/notification/mark-read", {
-    userId,
-    all: true,
-  });
-  return response.data;
-};
+export async function createNotification(payload) {
+  try {
+    const response = await api.post(API_BASE, payload);
+    return response.data;
+  } catch (error) {
+    console.error("Error creating notification:", error);
+    throw error;
+  }
+}
 
 /**
  * Fetch unread notification count
@@ -89,15 +109,18 @@ export const transformNotification = (notification, userId) => {
 
   // Extract rich content from compiledContent.inApp (preferred) or fallback to legacy fields
   const inApp = notification.compiledContent?.inApp || {};
+  // The backend might send metadata in 'data' (nested in inApp) or at root level
+  const data = inApp.data || notification.data || {};
   const payload = notification.payload || {};
 
   return {
     id: notification._id || notification.id,
 
-    // Prefer compiledContent.inApp over legacy title/body
+    // Content: compiled content takes precedence
     title: inApp.title || notification.title || "Notification",
-    desc: inApp.body || notification.body || notification.message || notification.description || "",
-    full: inApp.body || notification.fullMessage || notification.message || notification.description || "",
+    // Use compiled body if available
+    desc: inApp.body || notification.body || notification.message || "",
+    full: inApp.body || notification.fullMessage || notification.message || "",
 
     // Time formatting
     time: formatTimeAgo(notification.createdAt),
@@ -107,24 +130,25 @@ export const transformNotification = (notification, userId) => {
     unread: isUnread,
     read: !isUnread,
 
-    // Legacy type (for backward compatibility)
+    // Classification
     type: notification.type || "general",
 
-    // Intent-Based fields (NEW)
-    intent: payload.intent || 'operational',
-    priority: notification.priority || 'normal',
-    role: payload.role || null,
-    eventType: payload.eventType || null,
-    source: payload.source || null,
+    // Intent & Priority: Check data/payload first, fallback to defaults
+    intent: data.intent || payload.intent || notification.intent || 'operational',
+    priority: data.priority || payload.priority || notification.priority || 'normal',
 
-    // Actionable notification support
-    actionUrl: inApp.actionUrl || null,
+    // Metadata
+    role: data.role || payload.role || null,
+    source: data.source || payload.source || null,
+
+    // Action support
+    actionUrl: inApp.actionUrl || data.actionUrl || null,
     imageUrl: inApp.imageUrl || null,
 
-    // Context data
-    companyId: payload.companyId || notification.companyId,
-    shopId: payload.shopId || notification.shopId,
-    data: inApp.data || notification.data || {},
+    // Context
+    companyId: data.companyId || payload.companyId || notification.companyId,
+    shopId: data.shopId || payload.shopId || notification.shopId,
+    data: data,
   };
 };
 
@@ -149,6 +173,9 @@ export const formatTimeAgo = (timestamp) => {
 };
 
 export default {
+  getNotifications,
+  markNotificationsRead,
+  createNotification,
   fetchNotifications,
   markNotificationsAsRead,
   markAllNotificationsAsRead,

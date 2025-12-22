@@ -5,7 +5,7 @@ import { useSession } from "next-auth/react";
 import InventoryMovementChart from "@/components/dashboard/InventoryMovementChart";
 import CategoryTrendingChart from "@/components/dashboard/CategoryTrendingChart";
 import MetricCard from "@/components/dashboard/MetricCard";
-import { Package, TrendingDown,TrendingUp, Zap, Clock, AlertCircle,AlertTriangle } from "lucide-react";
+import { Package, TrendingDown, TrendingUp, Zap, Clock, AlertCircle, AlertTriangle } from "lucide-react";
 import {
   getInventoryMovement,
   getTrendingCategories,
@@ -16,7 +16,7 @@ export default function InventoryAnalyticsPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [period, setPeriod] = useState("30d");
-  
+
   const [movementData, setMovementData] = useState([]);
   const [categoryData, setCategoryData] = useState([]);
   const [metrics, setMetrics] = useState({
@@ -36,7 +36,7 @@ export default function InventoryAnalyticsPage() {
 
         const filters = {
           period,
-          interval: "day",
+          interval: period === "24h" ? "hour" : "day",
           companyId: session?.user?.companyId,
         };
 
@@ -79,9 +79,10 @@ export default function InventoryAnalyticsPage() {
             onChange={(e) => setPeriod(e.target.value)}
             className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-orange-500"
           >
+            <option value="24h">Last 24 Hours</option>
             <option value="7d">Last 7 Days</option>
             <option value="30d">Last 30 Days</option>
-            <option value="90d">Last 90 Days</option>
+            <option value="1y">Last Year</option>
           </select>
         </div>
         {error && (
