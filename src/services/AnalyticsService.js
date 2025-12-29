@@ -1,4 +1,4 @@
-import apiClient from "../../apiClient";
+import apiClient from "@/lib/apiClient";
 
 /**
  * Analytics Service for Company Admin & Super Admin Dashboard

@@ -1,27 +1,27 @@
-import api from "../lib/axios";
+import apiClient from "@/lib/apiClient";
 
 const UserService = {
   // Public
   register: async (data) => {
-    const res = await api.post("/auth/register", data);
+    const res = await apiClient.post("/auth/register", data);
     return res.data;
   },
   login: async (data) => {
-    const res = await api.post("/auth/login", data);
+    const res = await apiClient.post("/auth/login", data);
     return res.data;
   },
 
   // Protected User Routes
   getMe: async () => {
-    const res = await api.get("/auth/me");
+    const res = await apiClient.get("/auth/me");
     return res.data;
   },
   updateProfile: async (data) => {
-    const res = await api.put("/auth/me", data);
+    const res = await apiClient.put("/auth/me", data);
     return res.data;
   },
   deleteAccount: async () => {
-    const res = await api.delete("/auth/me");
+    const res = await apiClient.delete("/auth/me");
     return res.data;
   },
 
@@ -50,35 +50,35 @@ const UserService = {
   //   }
   // },
   getById: async (id) => {
-    const res = await api.get(`/auth/users/${id}`);
+    const res = await apiClient.get(`/auth/users/${id}`);
     return res.data;
   },
   create: async (data) => {
-    const res = await api.post("/auth/register", data);
+    const res = await apiClient.post("/auth/register", data);
     return res.data;
   },
   update: async (id, data) => {
-    const res = await api.put(`/auth/users/${id}`, data);
+    const res = await apiClient.put(`/auth/users/${id}`, data);
     return res.data;
   },
   delete: async (id) => {
-    const res = await api.delete(`/auth/users/${id}`);
+    const res = await apiClient.delete(`/auth/users/${id}`);
     return res.data;
   },
   bulkUpdate: async (data) => {
-    const res = await api.post("/auth/users/bulk", data);
+    const res = await apiClient.post("/auth/users/bulk", data);
     return res.data;
   },
   unlock: async (id) => {
-    const res = await api.post(`/auth/users/${id}/unlock`);
+    const res = await apiClient.post(`/auth/users/${id}/unlock`);
     return res.data;
   },
   verify: async (id) => {
-    const res = await api.post(`/auth/verify/${id}`);
+    const res = await apiClient.post(`/auth/verify/${id}`);
     return res.data;
   },
   getCompanyAdmins: async () => {
-    const res = await api.get("/auth/users/company-admins");
+    const res = await apiClient.get("/auth/users/company-admins");
     return (
       res.data?.admins || res.data?.users || res.data?.data || res.data || []
     );

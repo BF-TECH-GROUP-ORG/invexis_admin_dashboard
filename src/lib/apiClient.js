@@ -314,7 +314,7 @@ function clearCache(pattern) {
   }
 }
 
-export default {
+const apiClientMethods = {
   get,
   post,
   put,
@@ -325,3 +325,5 @@ export default {
   // Expose axios instance for advanced usage
   axios: apiClient,
 };
+
+export default apiClientMethods;
