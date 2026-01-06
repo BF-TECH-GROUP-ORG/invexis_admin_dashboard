@@ -257,14 +257,16 @@ export default function SideBar({
             title={expanded ? "Logout" : "Logout"}
             onClick={async () => {
               try {
-                // First, logout from backend to close session (send access token)
-                await logoutBackend(session?.accessToken);
+                // First, logout from backend if token exists
+                if (session?.accessToken) {
+                  await logoutBackend(session.accessToken);
+                }
               } catch (error) {
                 console.error("Backend logout error:", error);
-                // Continue with NextAuth logout even if backend fails
               } finally {
-                // Then logout from NextAuth
-                await signOut({ callbackUrl: "/auth/login" });
+                // Clear local cookies and redirect to login
+                // This will also trigger the middleware to see the user as logged out
+                await signOut({ callbackUrl: "/auth/login", redirect: true });
               }
             }}
           >

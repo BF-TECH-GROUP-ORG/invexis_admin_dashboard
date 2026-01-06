@@ -29,39 +29,88 @@ export const { auth, signIn, signOut, handlers } = NextAuth({
       if (user) {
         // Initial sign in
         token.accessToken = user.accessToken;
-        token.refreshToken = user.refreshToken; // Store refresh token in JWT
+        token.refreshToken = user.refreshToken;
         token.user = user.user;
-        // Set token expiry (15 minutes default)
-        token.expiresAt = Date.now() + 15 * 60 * 1000;
-      }
 
-      // If token is not expired, return it
-      if (Date.now() < token.expiresAt) {
+        // Use backend expiry (check both camelCase and snake_case), default to 15m
+        const backendExpiresIn = user.expires_in || user.expiresIn || 15 * 60;
+        const expiresInSeconds = parseInt(backendExpiresIn);
+
+        if (isNaN(expiresInSeconds)) {
+          // Fallback: try to decode JWT for exp claim
+          try {
+            const payload = JSON.parse(
+              Buffer.from(user.accessToken.split(".")[1], "base64").toString()
+            );
+            if (payload.exp) {
+              token.expiresAt = payload.exp * 1000;
+              console.log(
+                "[Auth] Extracted expiresAt from JWT exp claim:",
+                new Date(token.expiresAt).toISOString()
+              );
+            } else {
+              token.expiresAt = Date.now() + 15 * 60 * 1000;
+            }
+          } catch (e) {
+            token.expiresAt = Date.now() + 15 * 60 * 1000;
+          }
+        } else {
+          token.expiresAt = Date.now() + expiresInSeconds * 1000;
+        }
+
+        console.log(
+          `[Auth] Session initialized. Expiry: ${new Date(
+            token.expiresAt
+          ).toLocaleString()}`
+        );
         return token;
       }
 
-      // If token is expired, try to refresh
+      // If token is not yet expired, return it
+      // Buffer of 30 seconds to prevent race conditions
+      if (Date.now() < token.expiresAt - 30000) {
+        return token;
+      }
+
+      // If token is expired or close to it, try to refresh
       if (token.refreshToken) {
+        console.log(`[Auth] Access token expired, attempting refresh...`);
         try {
           const response = await axios.post(
             `${process.env.NEXT_PUBLIC_API_URL}/auth/refresh`,
-            {},
+            {
+              refreshToken: token.refreshToken, // Send in body too
+            },
             {
               headers: {
                 Cookie: `refreshToken=${token.refreshToken}`,
               },
+              withCredentials: true,
             }
           );
 
           if (response.data.ok) {
+            console.log("[Auth] Token refreshed successfully");
+            const expiresIn =
+              response.data.expires_in || response.data.expiresIn || 15 * 60;
             return {
               ...token,
               accessToken: response.data.accessToken,
-              expiresAt: Date.now() + response.data.expiresIn * 1000, // expiresIn is in seconds
+              expiresAt: Date.now() + expiresIn * 1000,
+              error: null,
             };
+          } else {
+            console.warn(
+              "[Auth] Refresh failed - response not OK",
+              response.data
+            );
+            return { ...token, error: "RefreshAccessTokenError" };
           }
         } catch (error) {
-          console.error("Error refreshing token", error);
+          console.error(
+            "[Auth] Refresh error:",
+            error.response?.data || error.message
+          );
           return { ...token, error: "RefreshAccessTokenError" };
         }
       }
@@ -69,6 +118,14 @@ export const { auth, signIn, signOut, handlers } = NextAuth({
       return token;
     },
     async session({ session, token }) {
+      if (process.env.NODE_ENV === "development") {
+        console.log(
+          "[Auth] Session Callback - User Role:",
+          token.user?.role,
+          "Error:",
+          token.error
+        );
+      }
       session.accessToken = token.accessToken;
       session.user = token.user;
       session.error = token.error;

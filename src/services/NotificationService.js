@@ -1,60 +1,43 @@
-import api from "@/lib/axios";
+import apiClient from "@/lib/apiClient";
 
 const API_BASE = "/notification";
 
 /**
  * Get User Notifications
- * GET /api/notifications
- * @param {Object} params
- * @param {number} params.page - Page number (default: 1)
- * @param {number} params.limit - Items per page (default: 50)
- * @param {boolean} params.unreadOnly - Filter unread items
- * @param {string} params.role - Filter by user role
- * @param {string} params.companyId - Filter by company context
- * @param {string} params.type - Filter by notification type
  */
-export async function getNotifications({ page = 1, limit = 10, unreadOnly, role, companyId, type } = {}) {
-  try {
-    const params = { page, limit };
-    if (unreadOnly !== undefined) params.unreadOnly = unreadOnly;
-    if (role) params.role = role;
-    if (companyId) params.companyId = companyId;
-    if (type) params.type = type;
+export async function getNotifications({
+  page = 1,
+  limit = 10,
+  unreadOnly,
+  role,
+  companyId,
+  type,
+} = {}) {
+  const params = { page, limit };
+  if (unreadOnly !== undefined) params.unreadOnly = unreadOnly;
+  if (role) params.role = role;
+  if (companyId) params.companyId = companyId;
+  if (type) params.type = type;
 
-    const response = await api.get(API_BASE, { params });
-    return response.data;
-  } catch (error) {
-    console.error("Error fetching notifications:", error);
-    throw error;
-  }
+  return apiClient.get(API_BASE, { params });
 }
 
-// Alias for backward compatibility (adapters for existing code)
+// Alias for backward compatibility
 export const fetchNotifications = async (userId, options = {}) => {
   return getNotifications(options);
 };
 
 /**
  * Mark Notifications as Read
- * POST /api/notifications/mark-read
- * @param {Object} payload
- * @param {string[]} payload.notificationIds - Array of notification IDs
- * @param {boolean} payload.all - Mark all as read
  */
 export async function markNotificationsRead({ notificationIds, all } = {}) {
-  try {
-    const response = await api.post(`${API_BASE}/mark-read`, {
-      notificationIds,
-      all,
-    });
-    return response.data;
-  } catch (error) {
-    console.error("Error marking notifications as read:", error);
-    throw error;
-  }
+  return apiClient.post(`${API_BASE}/mark-read`, {
+    notificationIds,
+    all,
+  });
 }
 
-// Alias
+// Aliases
 export const markNotificationsAsRead = async (userId, notificationIds) => {
   return markNotificationsRead({ notificationIds });
 };
@@ -65,87 +48,57 @@ export const markAllNotificationsAsRead = async (userId) => {
 
 /**
  * Create Notification (Admin / System Testing)
- * POST /api/notifications
  */
 export async function createNotification(payload) {
-  try {
-    const response = await api.post(API_BASE, payload);
-    return response.data;
-  } catch (error) {
-    console.error("Error creating notification:", error);
-    throw error;
-  }
+  return apiClient.post(API_BASE, payload);
 }
 
 /**
  * Fetch unread notification count
- * @param {string} userId - User ID
- * @param {object} options - Query options
- * @returns {Promise} Count of unread notifications
  */
 export const fetchUnreadCount = async (userId, options = {}) => {
   const notifications = await fetchNotifications(userId, {
     ...options,
     unreadOnly: true,
-    limit: 1000, // Get all unread to count
+    limit: 1000,
   });
-  return Array.isArray(notifications) ? notifications.length : 0;
+
+  // Since apiClient returns the payload, let's normalize
+  const data = notifications?.data || notifications || [];
+  return Array.isArray(data) ? data.length : 0;
 };
 
 /**
  * Transform backend notification to frontend format
- * 
- * Intent-Based Architecture:
- * - Prefers compiledContent.inApp for rich content
- * - Extracts intent and priority from payload
- * - Includes actionUrl for click-through navigation
- * 
- * @param {object} notification - Backend notification object
- * @param {string} userId - Current user ID
- * @returns {object} Formatted notification for UI
  */
 export const transformNotification = (notification, userId) => {
-  const isUnread = !notification.readBy?.includes(userId);
+  if (!notification) return {};
 
-  // Extract rich content from compiledContent.inApp (preferred) or fallback to legacy fields
+  const readBy = notification.readBy || [];
+  const isUnread = !readBy.includes(userId);
+
   const inApp = notification.compiledContent?.inApp || {};
-  // The backend might send metadata in 'data' (nested in inApp) or at root level
   const data = inApp.data || notification.data || {};
   const payload = notification.payload || {};
 
   return {
     id: notification._id || notification.id,
-
-    // Content: compiled content takes precedence
     title: inApp.title || notification.title || "Notification",
-    // Use compiled body if available
     desc: inApp.body || notification.body || notification.message || "",
     full: inApp.body || notification.fullMessage || notification.message || "",
-
-    // Time formatting
     time: formatTimeAgo(notification.createdAt),
     createdAt: notification.createdAt,
-
-    // Read state
     unread: isUnread,
     read: !isUnread,
-
-    // Classification
     type: notification.type || "general",
-
-    // Intent & Priority: Check data/payload first, fallback to defaults
-    intent: data.intent || payload.intent || notification.intent || 'operational',
-    priority: data.priority || payload.priority || notification.priority || 'normal',
-
-    // Metadata
+    intent:
+      data.intent || payload.intent || notification.intent || "operational",
+    priority:
+      data.priority || payload.priority || notification.priority || "normal",
     role: data.role || payload.role || null,
     source: data.source || payload.source || null,
-
-    // Action support
     actionUrl: inApp.actionUrl || data.actionUrl || null,
     imageUrl: inApp.imageUrl || null,
-
-    // Context
     companyId: data.companyId || payload.companyId || notification.companyId,
     shopId: data.shopId || payload.shopId || notification.shopId,
     data: data,
@@ -154,8 +107,6 @@ export const transformNotification = (notification, userId) => {
 
 /**
  * Format timestamp to "time ago" string
- * @param {string|Date} timestamp - Timestamp to format
- * @returns {string} Formatted time string
  */
 export const formatTimeAgo = (timestamp) => {
   if (!timestamp) return "";
@@ -183,4 +134,3 @@ export default {
   transformNotification,
   formatTimeAgo,
 };
-

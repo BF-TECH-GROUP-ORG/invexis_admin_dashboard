@@ -40,32 +40,92 @@ const getCsrfToken = () => {
  * Request interceptor
  * Attaches access token (Bearer) and CSRF token to each request
  */
+// Session cache to prevent excessive getSession calls
+let cachedSession = null;
+let lastSessionFetch = 0;
+const SESSION_CACHE_TTL = 5000; // 5 seconds
+const PAGE_LOAD_TIME = typeof window !== "undefined" ? Date.now() : 0;
+
 api.interceptors.request.use(
   async (config) => {
-    console.log(`[Axios] ${config.method?.toUpperCase()} ${config.url}`);
+    // Skip session check for auth routes to avoid loops
+    if (config.url?.includes("/auth/") && !config.url?.includes("/auth/me")) {
+      return config;
+    }
 
     if (typeof window !== "undefined") {
-      // Ensure headers object exists
       config.headers = config.headers || {};
 
       try {
-        // Get session and add Authorization header
-        console.log("[Axios] Fetching session...");
-        const session = await getSession();
+        const now = Date.now();
+        // Use cached session if it's fresh enough AND not null
+        const isCacheStale =
+          !cachedSession || now - lastSessionFetch > SESSION_CACHE_TTL;
 
-        if (session) {
-          console.log("[Axios] Session found");
-          if (session.accessToken) {
-            console.log("[Axios] Access token found, attaching to header");
-            config.headers.Authorization = `Bearer ${session.accessToken}`;
+        if (isCacheStale) {
+          const freshSession = await getSession();
+
+          if (freshSession) {
+            cachedSession = freshSession;
+            lastSessionFetch = now;
           } else {
-            console.warn("[Axios] Session exists but no accessToken found");
+            // Session is null. If we're in the first 10s of page load, retry or don't cache.
+            if (now - PAGE_LOAD_TIME < 10000) {
+              console.log(
+                `[Axios] Session null during warm-up for ${config.url}, retrying once...`
+              );
+              await new Promise((r) => setTimeout(r, 200));
+              const retrySession = await getSession();
+
+              if (retrySession) {
+                cachedSession = retrySession;
+                lastSessionFetch = now;
+              } else {
+                // Still null during warm-up: do NOT set lastSessionFetch.
+                // This allows the next request to try again immediately.
+                cachedSession = null;
+              }
+            } else {
+              // Not warming up and null: user is truly logged out. Cache the null.
+              cachedSession = null;
+              lastSessionFetch = now;
+            }
           }
-        } else {
-          console.warn("[Axios] No session found (getSession returned null)");
+        }
+
+        if (cachedSession) {
+          // If session has an error, trigger signOut immediately
+          if (cachedSession.error === "RefreshAccessTokenError") {
+            console.error(
+              "[Axios] Session Refresh Error detected in request interceptor. (Automatic signOut disabled to prevent loop)"
+            );
+            return Promise.reject(new Error("Session expired"));
+          }
+
+          if (cachedSession.accessToken) {
+            config.headers.Authorization = `Bearer ${cachedSession.accessToken}`;
+
+            if (process.env.NODE_ENV === "development") {
+              const token = cachedSession.accessToken;
+              console.log(
+                `[Axios Token Check] Token Start: "${token.substring(
+                  0,
+                  10
+                )}..." End: "...${token.substring(token.length - 10)}"`
+              );
+            }
+          }
         }
       } catch (error) {
-        console.error("[Axios] Error fetching session:", error);
+        console.error(`[Axios] Interceptor error for ${config.url}:`, error);
+      }
+
+      if (process.env.NODE_ENV === "development") {
+        console.log(
+          `[Axios] ${config.method?.toUpperCase()} ${config.url} (Auth: ${
+            config.headers.Authorization ? "YES" : "NO"
+          })`
+        );
       }
 
       // Add CSRF token for non-safe requests (POST, PUT, DELETE, PATCH)
@@ -114,17 +174,36 @@ api.interceptors.response.use(
 
     // Handle 401 Unauthorized - NextAuth middleware will redirect to login
     if (statusCode === 401) {
-      console.warn("[Axios] Unauthorized - session expired");
-      // Optional: don't show notification for 401 if it redirects?
-      // But maybe good to know session expired.
-      notificationBus.emit({
-        message: "Session expired. Please login again.",
-        severity: "error",
-      });
+      const hasToken = !!originalRequest?.headers?.Authorization;
+      console.warn(
+        `[Axios] 401 Unauthorized for ${originalRequest?.url} (Has Token: ${hasToken})`
+      );
 
-      // NextAuth middleware handles authentication, let it redirect
-      if (typeof window !== "undefined") {
-        window.location.href = "/auth/login";
+      const isOnAuthPage =
+        typeof window !== "undefined" &&
+        window.location.pathname.startsWith("/auth");
+
+      if (!isOnAuthPage && hasToken) {
+        // Prevent showing multiple "Session expired" notifications
+        const now = Date.now();
+        if (
+          !window._lastAuthErrorTime ||
+          now - window._lastAuthErrorTime > 5000
+        ) {
+          window._lastAuthErrorTime = now;
+          notificationBus.emit({
+            message: "Session expired. Please login again.",
+            severity: "error",
+          });
+
+          console.warn(
+            "[Axios] Session unauthorized. Notification shown. (Automatic signOut disabled to prevent loop)"
+          );
+        }
+      } else if (!hasToken) {
+        console.warn(
+          "[Axios] Request failed with 401 but no token was present. Session might not be ready. Not signing out."
+        );
       }
     } else if (statusCode === 403) {
       // Handle 403 Forbidden
@@ -140,10 +219,22 @@ api.interceptors.response.use(
         err.response?.data?.message ||
         err.message ||
         "An unexpected error occurred.";
-      notificationBus.emit({
-        message: msg,
-        severity: "error",
-      });
+
+      // Prevent flooding with the same error message
+      const errorKey = `err_${msg}`;
+      const now = Date.now();
+      if (!window._lastErrorMap) window._lastErrorMap = {};
+
+      if (
+        !window._lastErrorMap[errorKey] ||
+        now - window._lastErrorMap[errorKey] > 3000
+      ) {
+        window._lastErrorMap[errorKey] = now;
+        notificationBus.emit({
+          message: msg,
+          severity: "error",
+        });
+      }
     }
 
     return Promise.reject(err);

@@ -13,6 +13,7 @@ import {
   User,
   Shield,
   Save,
+  LogOut,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNotification } from "@/providers/NotificationProvider";
@@ -485,6 +486,36 @@ export default function ProfileSidebar({ open, onClose, user }) {
                       </p>
                     </div>
                   </div>
+                </section>
+
+                <div className="h-px bg-gray-100" />
+
+                <section className="pt-2">
+                  <button
+                    onClick={async () => {
+                      try {
+                        // First, logout from backend if token exists
+                        if (user?.accessToken) {
+                          await import("@/services/AuthService").then(
+                            ({ logout }) => logout(user.accessToken)
+                          );
+                        }
+                      } catch (error) {
+                        console.error("Backend logout error:", error);
+                      } finally {
+                        await import("next-auth/react").then(({ signOut }) =>
+                          signOut({
+                            callbackUrl: "/auth/login",
+                            redirect: true,
+                          })
+                        );
+                      }
+                    }}
+                    className="w-full py-4 bg-red-50 text-red-600 rounded-xl font-bold hover:bg-red-100 transition-all flex items-center justify-center gap-2 border border-red-100"
+                  >
+                    <LogOut size={20} />
+                    Logout Account
+                  </button>
                 </section>
               </div>
             </motion.div>

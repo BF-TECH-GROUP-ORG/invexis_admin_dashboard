@@ -19,10 +19,23 @@ export async function loginAction(prevState, formData) {
       {
         identifier,
         password,
+      },
+      {
+        timeout: 15000, // 15s timeout for login
       }
     );
 
     const data = response.data;
+    if (process.env.NODE_ENV === "development") {
+      console.log("[LoginAction] Backend response keys:", Object.keys(data));
+      console.log(
+        "[LoginAction] expiresIn:",
+        data.expiresIn,
+        "expires_in:",
+        data.expires_in
+      );
+    }
+
     if (!data.ok) {
       return "Login failed";
     }
@@ -87,8 +100,13 @@ export async function loginAction(prevState, formData) {
     }
 
     // Check for axios error response
-    if (axios.isAxiosError(error) && error.response) {
-      return error.response.data?.message || "Authentication failed";
+    if (axios.isAxiosError(error)) {
+      if (error.code === "ECONNABORTED" || error.code === "ECONNRESET") {
+        return "Server connection timed out or reset. Please check if the API is running.";
+      }
+      if (error.response) {
+        return error.response.data?.message || "Authentication failed";
+      }
     }
 
     console.error("Login action error:", error);

@@ -1,78 +1,78 @@
-import api from "../lib/axios";
+import apiClient from "@/lib/apiClient";
 
 const CompanyService = {
   // Core CRUD
   getAll: async (params = {}) => {
-    const res = await api.get("/company/companies", { params });
-    return res.data;
+    return apiClient.get("/company/companies", { params });
   },
 
   getById: async (id) => {
-    const res = await api.get(`/company/companies/${id}`);
-    return res.data;
+    return apiClient.get(`/company/companies/${id}`);
   },
 
   create: async (data) => {
-    const res = await api.post("/company/companies", data);
-    return res.data;
+    return apiClient.post("/company/companies", data);
   },
 
   update: async (id, data) => {
-    const res = await api.put(`/company/companies/${id}`, data);
-    return res.data;
+    return apiClient.put(`/company/companies/${id}`, data);
   },
 
   delete: async (id) => {
-    const res = await api.delete(`/company/companies/${id}`);
-    return res.data;
+    return apiClient.delete(`/company/companies/${id}`);
   },
 
   // Status & Tier
   changeStatus: async (id, status) => {
-    const res = await api.patch(`/company/companies/${id}/status`, { status });
-    return res.data;
+    return apiClient.patch(`/company/companies/${id}/status`, { status });
   },
 
   changeTier: async (id, tier) => {
-    const res = await api.patch(`/company/companies/${id}/tier`, { tier });
-    return res.data;
+    return apiClient.patch(`/company/companies/${id}/tier`, { tier });
   },
 
   reactivate: async (id) => {
-    const res = await api.patch(`/company/companies/${id}/reactivate`);
-    return res.data;
+    return apiClient.patch(`/company/companies/${id}/reactivate`);
   },
 
   // Verification
   uploadVerificationDocs: async (id, formData) => {
     // formData should be an instance of FormData if sending files
-    const res = await api.post(`/company/companies/${id}/verification-docs`, formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-    });
-    return res.data;
+    return apiClient.post(
+      `/company/companies/${id}/verification-docs`,
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      }
+    );
   },
 
   reviewVerification: async (id, decision, reviewNotes = "") => {
-    const res = await api.patch(`/company/companies/${id}/verification`, { decision, reviewNotes });
-    return res.data;
+    return apiClient.patch(`/company/companies/${id}/verification`, {
+      decision,
+      reviewNotes,
+    });
   },
 
   // Categories
   addCategories: async (id, categoryIds) => {
-    const res = await api.post(`/company/companies/${id}/categories`, { categoryIds });
-    return res.data;
+    return apiClient.post(`/company/companies/${id}/categories`, {
+      categoryIds,
+    });
   },
 
   setCategories: async (id, categoryIds) => {
-    const res = await api.put(`/company/companies/${id}/categories`, { categoryIds });
-    return res.data;
+    return apiClient.put(`/company/companies/${id}/categories`, {
+      categoryIds,
+    });
   },
 
   removeCategories: async (id, categoryIds) => {
-    const res = await api.delete(`/company/companies/${id}/categories`, { data: { categoryIds } });
-    return res.data;
+    return apiClient.delete(`/company/companies/${id}/categories`, {
+      data: { categoryIds },
+    });
   },
 };
 

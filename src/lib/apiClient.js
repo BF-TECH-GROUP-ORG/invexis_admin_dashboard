@@ -74,30 +74,33 @@ function setCachedResponse(key, data, ttl) {
  * Transform API errors to consistent format
  */
 function transformError(error) {
-  // If the error is already normalized by the bottom-layer axios instance
-  if (error && error.status !== undefined && error.message) {
+  // If the error is already a standard Error with our custom properties, return it
+  if (error instanceof Error && error.status !== undefined) {
     return error;
   }
 
+  let message = "An unexpected error occurred.";
+  let status = -1;
+  let data = null;
+
   if (error.response) {
-    return {
-      message: error.response.data?.message || error.message,
-      status: error.response.status,
-      data: error.response.data,
-    };
+    message = error.response.data?.message || error.message;
+    status = error.response.status;
+    data = error.response.data;
   } else if (error.request) {
-    return {
-      message: "Network Error: No response from server. Check CORS or Backend status.",
-      status: 0,
-      data: null,
-    };
+    message =
+      "Network Error: No response from server. Check CORS or Backend status.";
+    status = 0;
   } else {
-    return {
-      message: error.message || "Request setup failed",
-      status: -1,
-      data: null,
-    };
+    message = error.message || "Request setup failed";
   }
+
+  const enhancedError = new Error(message);
+  enhancedError.status = status;
+  enhancedError.data = data;
+  enhancedError.originalError = error;
+
+  return enhancedError;
 }
 
 /**
@@ -130,8 +133,8 @@ async function retryRequest(fn, retries = 1, delay = 100) {
 /**
  * Use the authenticated API instance from @/lib/axios.
  * This ensures we have the Bearer token and refresh logic.
- * 
- * Note: api already has interceptors for Auth. 
+ *
+ * Note: api already has interceptors for Auth.
  * We add additional ones for error transformation and logging.
  */
 const apiClient = api;
@@ -314,7 +317,7 @@ function clearCache(pattern) {
   }
 }
 
-const apiClientMethods = {
+export default {
   get,
   post,
   put,
@@ -325,5 +328,3 @@ const apiClientMethods = {
   // Expose axios instance for advanced usage
   axios: apiClient,
 };
-
-export default apiClientMethods;

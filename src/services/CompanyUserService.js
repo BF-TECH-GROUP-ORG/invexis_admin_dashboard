@@ -1,4 +1,4 @@
-import api from "../lib/axios";
+import apiClient from "@/lib/apiClient";
 
 /**
  * CompanyUserService - Manages user-company relationship operations
@@ -17,8 +17,7 @@ const CompanyUserService = {
    * @returns {Promise<Object>} Created company-user relationship
    */
   assignUserToCompany: async (data) => {
-    const res = await api.post("/company/company-users", data);
-    return res.data;
+    return apiClient.post("/company/company-users", data);
   },
 
   /**
@@ -27,8 +26,7 @@ const CompanyUserService = {
    * @returns {Promise<Array>} List of users in the company
    */
   getUsersByCompany: async (companyId) => {
-    const res = await api.get(`/company/company-users/company/${companyId}`);
-    return res.data;
+    return apiClient.get(`/company/company-users/company/${companyId}`);
   },
 
   /**
@@ -36,8 +34,7 @@ const CompanyUserService = {
    * @param {Object} params - query params (page, limit, search, companyId)
    */
   getAll: async (params = {}) => {
-    const res = await api.get(`/company/company-users`, { params });
-    return res.data;
+    return apiClient.get(`/company/company-users`, { params });
   },
 
   /**
@@ -46,8 +43,7 @@ const CompanyUserService = {
    * @returns {Promise<Array>} List of companies the user belongs to
    */
   getCompaniesByUser: async (userId) => {
-    const res = await api.get(`/company/company-users/user/${userId}`);
-    return res.data;
+    return apiClient.get(`/company/company-users/user/${userId}`);
   },
 
   /**
@@ -57,10 +53,9 @@ const CompanyUserService = {
    * @returns {Promise<Object>} User-company relationship details
    */
   getUserCompanyRelation: async (companyId, userId) => {
-    const res = await api.get(
+    return apiClient.get(
       `/company/company-users/company/${companyId}/user/${userId}`
     );
-    return res.data;
   },
 
   /**
@@ -71,13 +66,12 @@ const CompanyUserService = {
    * @returns {Promise<Object>} Updated relationship
    */
   updateUserRole: async (companyId, userId, roleId) => {
-    const res = await api.patch(
+    return apiClient.patch(
       `/company/company-users/company/${companyId}/user/${userId}/role`,
       {
         role_id: roleId,
       }
     );
-    return res.data;
   },
 
   /**
@@ -87,10 +81,9 @@ const CompanyUserService = {
    * @returns {Promise<Object>} Updated relationship with suspended status
    */
   suspendUser: async (companyId, userId) => {
-    const res = await api.patch(
+    return apiClient.patch(
       `/company/company-users/company/${companyId}/user/${userId}/suspend`
     );
-    return res.data;
   },
 
   /**
@@ -100,10 +93,9 @@ const CompanyUserService = {
    * @returns {Promise<Object>} Deletion confirmation
    */
   removeUserFromCompany: async (companyId, userId) => {
-    const res = await api.delete(
+    return apiClient.delete(
       `/company/company-users/company/${companyId}/user/${userId}`
     );
-    return res.data;
   },
 };
 

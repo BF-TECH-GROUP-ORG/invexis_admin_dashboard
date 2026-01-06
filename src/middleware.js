@@ -1,14 +1,53 @@
 import { auth } from "@/auth";
 import { NextResponse } from "next/server";
 
-export default auth((req) => {
+export default auth(async (req) => {
   const { nextUrl } = req;
-  const isLoggedIn = !!req.auth;
+  const isApiRoute = nextUrl.pathname.startsWith("/api");
+
+  // 🛡️ CRITICAL: Move logging to TOP to see what's happening
+  if (process.env.NODE_ENV === "development") {
+    console.log(`[Middleware Request] Path: ${nextUrl.pathname}`);
+  }
+
+  // Improved asset check: anything with a dot, or in common asset folders
+  const isAsset =
+    nextUrl.pathname.includes(".") ||
+    nextUrl.pathname.startsWith("/images/") ||
+    nextUrl.pathname.startsWith("/fonts/") ||
+    nextUrl.pathname.startsWith("/icons/") ||
+    nextUrl.pathname.startsWith("/assets/") ||
+    nextUrl.pathname.startsWith("/_next/");
+
+  if (isAsset || isApiRoute) {
+    if (process.env.NODE_ENV === "development" && isAsset) {
+      console.log(`[Middleware Bypass] Asset: ${nextUrl.pathname}`);
+    }
+    return NextResponse.next();
+  }
+
+  // Check for session
+  const session = await auth();
+  const isLoggedIn = !!session?.user;
   const isOnAuth = nextUrl.pathname.startsWith("/auth");
+
+  if (process.env.NODE_ENV === "development") {
+    console.log(
+      `[Middleware Auth] Path: ${nextUrl.pathname} | LoggedIn: ${isLoggedIn} | Role: ${session?.user?.role}`
+    );
+  }
+
+  // If there's an auth error and they are not on an auth page, redirect to login
+  if (hasAuthError && !isOnAuth) {
+    console.warn(
+      `[Middleware] Auth error detected on ${nextUrl.pathname}, redirecting to login`
+    );
+    return NextResponse.redirect(new URL("/auth/login", nextUrl));
+  }
 
   // Allow access to auth pages if not logged in
   if (isOnAuth) {
-    if (isLoggedIn) {
+    if (isLoggedIn && !hasAuthError) {
       // Redirect logged-in users away from auth pages
       return NextResponse.redirect(new URL("/", nextUrl));
     }
@@ -16,13 +55,16 @@ export default auth((req) => {
   }
 
   // For all other routes, check authentication
-  if (!isLoggedIn) {
+  if (!isLoggedIn || hasAuthError) {
     return NextResponse.redirect(new URL("/auth/login", nextUrl));
   }
 
   // Check if user is super_admin
-  const userRole = req.auth?.user?.role;
+  const userRole = session?.user?.role;
   if (userRole !== "super_admin") {
+    console.warn(
+      `[Middleware] Unauthorized role: ${userRole} for path ${nextUrl.pathname}`
+    );
     // Unauthorized - redirect to login or an unauthorized page
     return NextResponse.redirect(new URL("/auth/login", nextUrl));
   }
@@ -32,5 +74,6 @@ export default auth((req) => {
 });
 
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|public).*)"],
+  // Broad matcher, logic inside middleware handles exclusions properly now
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
 };

@@ -1,4 +1,4 @@
-import api from "@/lib/axios";
+import apiClient from "@/lib/apiClient";
 
 /**
  * Login with email/password
@@ -25,22 +25,14 @@ export const login = (credentials) => {
     url: "/auth/login",
   });
 
-  return api.post("/auth/login", payload).catch((err) => {
-    console.error("[AuthService] Login API error:", {
-      status: err.response?.status,
-      statusText: err.response?.statusText,
-      message: err.message,
-      data: err.response?.data,
-    });
-    throw err;
-  });
+  return apiClient.post("/auth/login", payload);
 };
 
 /**
  * Refresh access token using httpOnly refresh token cookie
  * Returns: { ok: true, accessToken }
  */
-export const refreshToken = () => api.post("/auth/refresh");
+export const refreshToken = () => apiClient.post("/auth/refresh");
 
 /**
  * Logout user and invalidate session on backend
@@ -55,8 +47,8 @@ export const logout = async (token = null) => {
     }
 
     // Send logout request to backend so server can invalidate session/cookie
-    const response = await api.post("/auth/logout", {}, { headers });
-    return response.data;
+    const response = await apiClient.post("/auth/logout", {}, { headers });
+    return response;
   } catch (err) {
     console.error(
       "Logout API error (will still clear local state):",
@@ -71,16 +63,17 @@ export const logout = async (token = null) => {
  * Get current user profile (requires valid access token)
  * Returns: { ok: true, user: {...} }
  */
-export const getMe = () => api.get("/auth/me");
+export const getMe = () => apiClient.get("/auth/me");
 
 /**
  * Update user profile (requires valid access token)
  * Returns: { ok: true, user: {...} }
  */
-export const updateProfile = (profileData) => api.put("/auth/me", profileData);
+export const updateProfile = (profileData) =>
+  apiClient.put("/auth/me", profileData);
 
 /**
  * Change password (requires valid access token and 2FA if enabled)
  */
 export const changePassword = (payload) =>
-  api.post("/auth/me/password/change", payload);
+  apiClient.post("/auth/me/password/change", payload);

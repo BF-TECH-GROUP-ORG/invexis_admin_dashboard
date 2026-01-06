@@ -1,10 +1,9 @@
-import api from "../lib/axios";
+import apiClient from "@/lib/apiClient";
 
 const CategoryService = {
   // Primary API (original name kept for backward compatibility)
   getAll: async (params = {}) => {
-    const res = await api.get("/inventory/v1/categories", { params });
-    return res.data;
+    return apiClient.get("/inventory/v1/categories", { params });
   },
 
   // Convenience alias used across the app
@@ -13,23 +12,19 @@ const CategoryService = {
   },
 
   getById: async (id) => {
-    const res = await api.get(`/inventory/v1/categories/${id}`);
-    return res.data;
+    return apiClient.get(`/inventory/v1/categories/${id}`);
   },
 
   create: async (data) => {
-    const res = await api.post("/inventory/v1/categories", data);
-    return res.data;
+    return apiClient.post("/inventory/v1/categories", data);
   },
 
   update: async (id, data) => {
-    const res = await api.put(`/inventory/v1/categories/${id}`, data);
-    return res.data;
+    return apiClient.put(`/inventory/v1/categories/${id}`, data);
   },
 
   delete: async (id) => {
-    const res = await api.delete(`/inventory/v1/categories/${id}`);
-    return res.data;
+    return apiClient.delete(`/inventory/v1/categories/${id}`);
   },
 
   // Alias expected by components
@@ -38,10 +33,9 @@ const CategoryService = {
   },
 
   getLevel3ByCompany: async (companyId) => {
-    const res = await api.get(
+    return apiClient.get(
       `/inventory/v1/categories/company/${companyId}/level3`
     );
-    return res.data;
   },
 };
 
