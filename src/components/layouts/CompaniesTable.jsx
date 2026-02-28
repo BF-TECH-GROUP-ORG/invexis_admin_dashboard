@@ -45,7 +45,16 @@ import CompanyDetailsModal from "./CompanyDetailsModal";
 import { setTablePagination } from "@/features/SettingsSlice";
 
 export default function CompaniesTable() {
-  const tableSettings = useSelector((s) => s.settings?.tables?.companies || {});
+  // Safe selector with SSR fallback
+  const tableSettings = useSelector((s) => {
+    try {
+      return s?.settings?.tables?.companies || {};
+    } catch (error) {
+      // Handle SSR or store not ready
+      return {};
+    }
+  });
+
   const tableFilters = tableSettings.filters || {};
   const [tierFilter, setTierFilter] = useState(tableFilters.tierFilter || "");
   const [statusFilter, setStatusFilter] = useState(
@@ -242,7 +251,7 @@ export default function CompaniesTable() {
 
   const handleUploadDocuments = async (id, files) => {
     const fd = new FormData();
-    Array.from(files).forEach((f) => fd.append("documents", f));
+    Array.from(files).forEach((f) => fd.append("files", f));
     try {
       showLoader();
       await CompanyService.uploadVerificationDocs(id, fd);

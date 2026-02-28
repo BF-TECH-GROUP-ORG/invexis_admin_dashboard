@@ -35,25 +35,25 @@ export const { auth, signIn, signOut, handlers } = NextAuth({
   callbacks: {
     async jwt({ token, user, trigger, session }) {
       if (user) {
-        // Initial sign in - user object from credentials provider contains:
-        // { accessToken, expiresIn, refreshToken, user: {...} }
+        // Initial sign in
         token.accessToken = user.accessToken;
         token.refreshToken = user.refreshToken;
         token.user = user.user;
         token.error = null;
 
-        // Use backend expiry - the value is already in seconds from backend
-        const expiresInSeconds = parseInt(user.expiresIn || 7200); // fallback to 2 hours
+        // Use backend expiry (check both camelCase and snake_case)
+        const backendExpiresIn = user.expires_in || user.expiresIn || 2 * 60 * 60; // Default 2 hours
+        const expiresInSeconds = parseInt(backendExpiresIn);
 
         if (isNaN(expiresInSeconds) || expiresInSeconds <= 0) {
-          console.warn("[Auth] Invalid expiresIn value:", user.expiresIn, "using 2 hours default");
+          console.warn("[Auth] Invalid expiresIn value, using 2 hours default");
           token.expiresAt = Date.now() + 2 * 60 * 60 * 1000;
         } else {
           token.expiresAt = Date.now() + expiresInSeconds * 1000;
         }
 
         console.log(
-          `[Auth JWT] Token initialized. Expires in ${Math.round((token.expiresAt - Date.now()) / 1000)}s (user.expiresIn: ${user.expiresIn})`
+          `[Auth] Session initialized. Expires in ${Math.round((token.expiresAt - Date.now()) / 1000)}s`
         );
         return token;
       }

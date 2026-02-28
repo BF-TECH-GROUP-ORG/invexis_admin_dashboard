@@ -47,39 +47,6 @@ export default function LoginForm() {
       const result = await loginAction(null, formDataObj);
 
       if (result?.success) {
-        // After server-side sign-in, hydrate NextAuth client session before
-        // redirecting to avoid requests racing ahead of session hydration.
-        const hydrateSession = async (attempts = 6, delay = 500) => {
-          for (let i = 0; i < attempts; i++) {
-            try {
-              const resp = await fetch("/api/auth/session", {
-                method: "GET",
-                credentials: "include",
-                headers: { "Content-Type": "application/json" },
-              });
-
-              if (resp.ok) {
-                const json = await resp.json();
-                // If NextAuth session now includes an accessToken, we're hydrated
-                if (json?.accessToken) {
-                  return true;
-                }
-              }
-            } catch (e) {
-              // ignore and retry
-            }
-
-            await new Promise((res) => setTimeout(res, delay));
-          }
-          return false;
-        };
-
-        try {
-          await hydrateSession();
-        } catch (e) {
-          // proceed regardless
-        }
-
         // Login successful, redirect to dashboard
         router.push("/");
         router.refresh();

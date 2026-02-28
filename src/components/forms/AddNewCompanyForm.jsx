@@ -106,19 +106,32 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
     }
   }, [initialData]);
 
-  // Fetch company admins
+  // Fetch company admins (Consolidated)
   useEffect(() => {
     let mounted = true;
-    (async () => {
+    const fetchAdmins = async () => {
       try {
-        const admins = await UserService.getCompanyAdmins();
+        const res = await UserService.getCompanyAdmins();
+        // Handle response structure { admins: [...] } or direct array
+        const adminsList = res?.admins || (Array.isArray(res) ? res : []);
+
         if (mounted) {
-          setCompanyAdmins(Array.isArray(admins) ? admins : []);
+          setCompanyAdmins(adminsList);
+          setCompanyAdminOptions(adminsList);
+          if (process.env.NODE_ENV === "development") {
+            console.log(`[Form] Loaded ${adminsList.length} company admins`);
+          }
         }
       } catch (e) {
         console.error("Failed to fetch company admins", e);
+        if (mounted) {
+          setCompanyAdmins([]);
+          setCompanyAdminOptions([]);
+        }
       }
-    })();
+    };
+
+    fetchAdmins();
     return () => (mounted = false);
   }, []);
 
@@ -141,27 +154,6 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
         }
       } catch (e) {
         console.error("Failed to fetch categories", e);
-      }
-    })();
-    return () => (mounted = false);
-  }, []);
-
-  // Fetch available company_admin users for assignment while creating a company
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const res = await UserService.getCompanyAdmins();
-        const usersPayload = res?.admins ?? res ?? [];
-        // Ensure we always set an array to prevent .map() errors
-        if (mounted) {
-          setCompanyAdminOptions(
-            Array.isArray(usersPayload) ? usersPayload : []
-          );
-        }
-      } catch (e) {
-        console.error("Failed to fetch company admin users", e);
-        if (mounted) setCompanyAdminOptions([]);
       }
     })();
     return () => (mounted = false);
@@ -324,7 +316,7 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
       if (res?.success || res?.id || res?.data?.success) {
         try {
           localStorage.removeItem("companies_cache_v1");
-        } catch (e) {}
+        } catch (e) { }
 
         showNotification({
           message: initialData ? "Company updated" : "Company added",
@@ -388,11 +380,10 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
                           handleInputChange("name", e.target.value)
                         }
                         placeholder="e.g., TechHub Rwanda Ltd"
-                        className={`w-full px-4 py-3 rounded-2xl border-2 outline-none transition-all focus:border-[#ff782d] ${
-                          errors.name
-                            ? "border-red-500"
-                            : "border-[#d1d5db] hover:border-[#ff782d]"
-                        } bg-white text-[#081422] placeholder-[#6b7280]`}
+                        className={`w-full px-4 py-3 rounded-2xl border-2 outline-none transition-all focus:border-[#ff782d] ${errors.name
+                          ? "border-red-500"
+                          : "border-[#d1d5db] hover:border-[#ff782d]"
+                          } bg-white text-[#081422] placeholder-[#6b7280]`}
                       />
                       {errors.name && (
                         <p className="text-red-500 text-sm mt-1">
@@ -412,11 +403,10 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
                           handleInputChange("domain", e.target.value)
                         }
                         placeholder="e.g., techhub-rw-1763386831.com"
-                        className={`w-full px-4 py-3 rounded-2xl border-2 outline-none transition-all focus:border-[#ff782d] ${
-                          errors.domain
-                            ? "border-red-500"
-                            : "border-[#d1d5db] hover:border-[#ff782d]"
-                        } bg-white text-[#081422] placeholder-[#6b7280]`}
+                        className={`w-full px-4 py-3 rounded-2xl border-2 outline-none transition-all focus:border-[#ff782d] ${errors.domain
+                          ? "border-red-500"
+                          : "border-[#d1d5db] hover:border-[#ff782d]"
+                          } bg-white text-[#081422] placeholder-[#6b7280]`}
                       />
                       {errors.domain && (
                         <p className="text-red-500 text-sm mt-1">
@@ -436,11 +426,10 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
                           handleInputChange("email", e.target.value)
                         }
                         placeholder="e.g., info@company.com"
-                        className={`w-full px-4 py-3 rounded-2xl border-2 outline-none transition-all focus:border-[#ff782d] ${
-                          errors.email
-                            ? "border-red-500"
-                            : "border-[#d1d5db] hover:border-[#ff782d]"
-                        } bg-white text-[#081422] placeholder-[#6b7280]`}
+                        className={`w-full px-4 py-3 rounded-2xl border-2 outline-none transition-all focus:border-[#ff782d] ${errors.email
+                          ? "border-red-500"
+                          : "border-[#d1d5db] hover:border-[#ff782d]"
+                          } bg-white text-[#081422] placeholder-[#6b7280]`}
                       />
                       {errors.email && (
                         <p className="text-red-500 text-sm mt-1">
@@ -534,11 +523,10 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
                           handleInputChange("phone", e.target.value)
                         }
                         placeholder="e.g., +250788123456"
-                        className={`w-full px-4 py-3 rounded-2xl border-2 outline-none transition-all focus:border-[#ff782d] ${
-                          errors.phone
-                            ? "border-red-500"
-                            : "border-[#d1d5db] hover:border-[#ff782d]"
-                        } bg-white text-[#081422] placeholder-[#6b7280]`}
+                        className={`w-full px-4 py-3 rounded-2xl border-2 outline-none transition-all focus:border-[#ff782d] ${errors.phone
+                          ? "border-red-500"
+                          : "border-[#d1d5db] hover:border-[#ff782d]"
+                          } bg-white text-[#081422] placeholder-[#6b7280]`}
                       />
                       {errors.phone && (
                         <p className="text-red-500 text-sm mt-1">
@@ -552,11 +540,10 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
                         Country
                       </label>
                       <div
-                        className={`w-full px-4 py-3 rounded-2xl border-2 outline-none transition-all cursor-pointer flex items-center justify-between ${
-                          errors.country
-                            ? "border-red-500"
-                            : "border-[#d1d5db] hover:border-[#ff782d]"
-                        } bg-white text-[#081422]`}
+                        className={`w-full px-4 py-3 rounded-2xl border-2 outline-none transition-all cursor-pointer flex items-center justify-between ${errors.country
+                          ? "border-red-500"
+                          : "border-[#d1d5db] hover:border-[#ff782d]"
+                          } bg-white text-[#081422]`}
                         onClick={() =>
                           setIsCountryDropdownOpen(!isCountryDropdownOpen)
                         }
@@ -578,9 +565,8 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
                           )}
                         </span>
                         <ChevronRight
-                          className={`transform transition-transform ${
-                            isCountryDropdownOpen ? "rotate-90" : ""
-                          }`}
+                          className={`transform transition-transform ${isCountryDropdownOpen ? "rotate-90" : ""
+                            }`}
                           size={20}
                         />
                       </div>
@@ -606,11 +592,10 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
                                   setIsCountryDropdownOpen(false);
                                   setCountrySearch("");
                                 }}
-                                className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors ${
-                                  formData.country === c.name
-                                    ? "bg-[#fff8f5] text-[#ff782d]"
-                                    : "hover:bg-[#f3f4f6] text-[#081422]"
-                                }`}
+                                className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors ${formData.country === c.name
+                                  ? "bg-[#fff8f5] text-[#ff782d]"
+                                  : "hover:bg-[#f3f4f6] text-[#081422]"
+                                  }`}
                               >
                                 <img
                                   src={`https://flagcdn.com/w40/${c.code.toLowerCase()}.png`}
@@ -646,11 +631,10 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
                           handleInputChange("city", e.target.value)
                         }
                         placeholder="e.g., Kigali"
-                        className={`w-full px-4 py-3 rounded-2xl border-2 outline-none transition-all focus:border-[#ff782d] ${
-                          errors.city
-                            ? "border-red-500"
-                            : "border-[#d1d5db] hover:border-[#ff782d]"
-                        } bg-white text-[#081422] placeholder-[#6b7280]`}
+                        className={`w-full px-4 py-3 rounded-2xl border-2 outline-none transition-all focus:border-[#ff782d] ${errors.city
+                          ? "border-red-500"
+                          : "border-[#d1d5db] hover:border-[#ff782d]"
+                          } bg-white text-[#081422] placeholder-[#6b7280]`}
                       />
                       {errors.city && (
                         <p className="text-red-500 text-sm mt-1">
@@ -669,11 +653,10 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
                         Select Company Admin
                       </label>
                       <div
-                        className={`w-full px-4 py-3 rounded-2xl border-2 outline-none transition-all cursor-pointer flex items-center justify-between ${
-                          errors.company_admin_id
-                            ? "border-red-500"
-                            : "border-[#d1d5db] hover:border-[#ff782d]"
-                        } bg-white text-[#081422]`}
+                        className={`w-full px-4 py-3 rounded-2xl border-2 outline-none transition-all cursor-pointer flex items-center justify-between ${errors.company_admin_id
+                          ? "border-red-500"
+                          : "border-[#d1d5db] hover:border-[#ff782d]"
+                          } bg-white text-[#081422]`}
                         onClick={() =>
                           setIsAdminDropdownOpen(!isAdminDropdownOpen)
                         }
@@ -688,9 +671,8 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
                             : "Select a company admin"}
                         </span>
                         <ChevronRight
-                          className={`transform transition-transform ${
-                            isAdminDropdownOpen ? "rotate-90" : ""
-                          }`}
+                          className={`transform transition-transform ${isAdminDropdownOpen ? "rotate-90" : ""
+                            }`}
                           size={20}
                         />
                       </div>
@@ -720,11 +702,10 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
                                     setIsAdminDropdownOpen(false);
                                     setAdminSearch("");
                                   }}
-                                  className={`flex flex-col p-3 rounded-xl cursor-pointer transition-colors ${
-                                    formData.company_admin_id === admin._id
-                                      ? "bg-[#fff8f5] text-[#ff782d]"
-                                      : "hover:bg-[#f3f4f6] text-[#081422]"
-                                  }`}
+                                  className={`flex flex-col p-3 rounded-xl cursor-pointer transition-colors ${formData.company_admin_id === admin._id
+                                    ? "bg-[#fff8f5] text-[#ff782d]"
+                                    : "hover:bg-[#f3f4f6] text-[#081422]"
+                                    }`}
                                 >
                                   <span className="font-medium">
                                     {admin.firstName} {admin.lastName}
@@ -805,18 +786,16 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
                                   ]);
                                 }
                               }}
-                              className={`p-4 rounded-xl border-2 cursor-pointer transition-all flex items-center justify-between ${
-                                isSelected
-                                  ? "border-[#ff782d] bg-[#fff8f5]"
-                                  : "border-[#d1d5db] hover:border-[#ff782d]"
-                              }`}
+                              className={`p-4 rounded-xl border-2 cursor-pointer transition-all flex items-center justify-between ${isSelected
+                                ? "border-[#ff782d] bg-[#fff8f5]"
+                                : "border-[#d1d5db] hover:border-[#ff782d]"
+                                }`}
                             >
                               <span
-                                className={`font-medium ${
-                                  isSelected
-                                    ? "text-[#ff782d]"
-                                    : "text-[#081422]"
-                                }`}
+                                className={`font-medium ${isSelected
+                                  ? "text-[#ff782d]"
+                                  : "text-[#081422]"
+                                  }`}
                               >
                                 {cat.name}
                               </span>
@@ -881,11 +860,10 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
                         {["basic", "pro", "mid"].map((tierOption) => (
                           <label
                             key={tierOption}
-                            className={`flex items-center p-4 rounded-2xl border-2 cursor-pointer transition-all ${
-                              formData.tier === tierOption
-                                ? "border-[#ff782d] bg-[#fff8f5]"
-                                : "border-[#d1d5db] hover:border-[#ff782d]"
-                            }`}
+                            className={`flex items-center p-4 rounded-2xl border-2 cursor-pointer transition-all ${formData.tier === tierOption
+                              ? "border-[#ff782d] bg-[#fff8f5]"
+                              : "border-[#d1d5db] hover:border-[#ff782d]"
+                              }`}
                           >
                             <input
                               type="radio"
@@ -922,11 +900,10 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
                             handleInputChange("industry", e.target.value)
                           }
                           placeholder="e.g., Technology"
-                          className={`w-full px-4 py-3 rounded-2xl border-2 outline-none transition-all focus:border-[#ff782d] ${
-                            errors.industry
-                              ? "border-red-500"
-                              : "border-[#d1d5db] hover:border-[#ff782d]"
-                          } bg-white text-[#081422] placeholder-[#6b7280]`}
+                          className={`w-full px-4 py-3 rounded-2xl border-2 outline-none transition-all focus:border-[#ff782d] ${errors.industry
+                            ? "border-red-500"
+                            : "border-[#d1d5db] hover:border-[#ff782d]"
+                            } bg-white text-[#081422] placeholder-[#6b7280]`}
                         />
                         {errors.industry && (
                           <p className="text-red-500 text-sm mt-1">
@@ -1033,11 +1010,10 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
                   type="button"
                   onClick={handlePrev}
                   disabled={currentStep === 1}
-                  className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-semibold transition-all ${
-                    currentStep === 1
-                      ? "bg-[#f3f4f6] text-[#d1d5db] cursor-not-allowed"
-                      : "border-2 border-[#d1d5db] text-[#081422] hover:border-[#ff782d] hover:text-[#ff782d]"
-                  }`}
+                  className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-semibold transition-all ${currentStep === 1
+                    ? "bg-[#f3f4f6] text-[#d1d5db] cursor-not-allowed"
+                    : "border-2 border-[#d1d5db] text-[#081422] hover:border-[#ff782d] hover:text-[#ff782d]"
+                    }`}
                 >
                   <ChevronLeft size={20} />
                   Previous
@@ -1085,13 +1061,12 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
                   <div key={step.id} className="flex items-start gap-4">
                     {/* Circle indicator */}
                     <div
-                      className={`w-14 h-14 rounded-full flex items-center justify-center font-semibold transition-all flex-shrink-0 ${
-                        step.id < currentStep
-                          ? "bg-[#ff782d] text-white"
-                          : step.id === currentStep
+                      className={`w-14 h-14 rounded-full flex items-center justify-center font-semibold transition-all flex-shrink-0 ${step.id < currentStep
+                        ? "bg-[#ff782d] text-white"
+                        : step.id === currentStep
                           ? "bg-[#ff782d] text-white border-4 border-[#fff8f5] ring-2 ring-[#ff782d]"
                           : "border-2 border-[#d1d5db] text-[#6b7280] bg-white"
-                      }`}
+                        }`}
                     >
                       {step.id < currentStep ? <Check size={24} /> : step.id}
                     </div>
@@ -1099,11 +1074,10 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
                     {/* Step title */}
                     <div className="pt-2">
                       <p
-                        className={`font-semibold text-sm transition-colors ${
-                          step.id <= currentStep
-                            ? "text-[#081422]"
-                            : "text-[#6b7280]"
-                        }`}
+                        className={`font-semibold text-sm transition-colors ${step.id <= currentStep
+                          ? "text-[#081422]"
+                          : "text-[#6b7280]"
+                          }`}
                       >
                         {step.title}
                       </p>

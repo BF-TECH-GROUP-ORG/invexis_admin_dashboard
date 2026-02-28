@@ -77,13 +77,13 @@ export async function loginAction(prevState, formData) {
 
     // Prepare clean user data for NextAuth JWT
     // The backend returns: { ok, accessToken, expires_in, user: {...}, ... }
-      // Build a compact payload for NextAuth credentials provider
-      const signInPayload = {
-        accessToken: data.accessToken,
-        refreshToken: refreshTokenValue,
-        user: data.user || null,
-        expires_in: data.expires_in || data.expiresIn || null,
-      };
+    // Build a compact payload for NextAuth credentials provider
+    const signInPayload = {
+      accessToken: data.accessToken,
+      refreshToken: refreshTokenValue,
+      user: data.user || null,
+      expires_in: data.expires_in || data.expiresIn || null,
+    };
 
     if (process.env.NODE_ENV === "development") {
       console.log("[LoginAction] User data prepared for JWT:", {
@@ -97,17 +97,17 @@ export async function loginAction(prevState, formData) {
 
     // Sign in with NextAuth (store session server-side)
     // Pass the user object as a JSON string to the credentials provider
-      await signIn("credentials", {
-        user: JSON.stringify(signInPayload),
+    await signIn("credentials", {
+      user: JSON.stringify(signInPayload),
       redirect: false,
     });
 
     // Return accessToken to client as a fallback so the client can attach it
     // immediately (useful before NextAuth client state hydrates).
-    return { 
-      success: true, 
-      accessToken: data.accessToken, 
-      expires_in: data.expires_in || data.expiresIn 
+    return {
+      success: true,
+      accessToken: data.accessToken,
+      expires_in: data.expires_in || data.expiresIn,
     };
   } catch (error) {
     if (error instanceof AuthError) {

@@ -42,19 +42,8 @@ const getCsrfToken = () => {
  */
 api.interceptors.request.use(
   async (config) => {
-    // Skip session check for public auth routes and NextAuth internal routes to avoid loops
-    // Authenticated backend routes like /auth/users/... should still get the token
-    const isPublicAuthRoute = [
-      "/auth/login",
-      "/auth/register",
-      "/auth/refresh",
-      "/auth/forgot-password",
-      "/auth/reset-password",
-    ].some((path) => config.url?.includes(path));
-
-    const isNextAuthInternal = config.url?.includes("/api/auth/");
-
-    if ((isPublicAuthRoute || isNextAuthInternal) && !config.url?.includes("/auth/me")) {
+    // Skip session check for auth routes to avoid loops
+    if (config.url?.includes("/auth/") && !config.url?.includes("/auth/me")) {
       return config;
     }
 
@@ -80,12 +69,47 @@ api.interceptors.request.use(
             );
           }
         } else {
-          // Fallback: directly fetch the NextAuth session endpoint if
-          // the client helper doesn't yet have the token. We use a short
-          // cooldown to avoid calling this on every request.
+          // 1) Try localStorage fallback (set by login form) - immediate and synchronous
           try {
-            if (!window._lastSessionFetch || Date.now() - window._lastSessionFetch > 2000) {
+            const storedToken = localStorage.getItem("accessToken");
+            const storedExpires = localStorage.getItem("accessTokenExpiresAt");
+                if (storedToken) {
+              const expiresAt = storedExpires ? parseInt(storedExpires) : 0;
+              if (!expiresAt || Date.now() < expiresAt) {
+                config.headers.Authorization = `Bearer ${storedToken}`;
+                try {
+                  if (typeof window !== "undefined") window._hadValidSession = true;
+                } catch (e) {
+                  // ignore
+                }
+                if (process.env.NODE_ENV === "development") {
+                  console.log(
+                    `[Axios Auth Fallback] Attached token from localStorage for ${config.url}`
+                  );
+                }
+              } else {
+                // token expired in localStorage, remove it
+                localStorage.removeItem("accessToken");
+                localStorage.removeItem("accessTokenExpiresAt");
+              }
+            }
+          } catch (lsErr) {
+            if (process.env.NODE_ENV === "development") {
+              console.warn(`[Axios] localStorage read failed:`, lsErr);
+            }
+          }
+
+          // 2) Fallback: directly fetch the session endpoint. This helps when the
+          // client-side next-auth state hasn't hydrated yet immediately after
+          // a server-side login action.
+          try {
+            // Avoid hammering the session endpoint on every request.
+            if (
+              !window._lastSessionFetch ||
+              Date.now() - window._lastSessionFetch > 2000
+            ) {
               window._lastSessionFetch = Date.now();
+
               const resp = await fetch("/api/auth/session", {
                 method: "GET",
                 credentials: "include",
@@ -101,6 +125,14 @@ api.interceptors.request.use(
                   } catch (e) {
                     // ignore
                   }
+                  // Clear localStorage fallback to avoid stale tokens
+                  try {
+                    localStorage.removeItem("accessToken");
+                    localStorage.removeItem("accessTokenExpiresAt");
+                  } catch (e) {
+                    // ignore
+                  }
+
                   if (process.env.NODE_ENV === "development") {
                     const t = sessionJson.accessToken;
                     console.debug(
@@ -112,7 +144,10 @@ api.interceptors.request.use(
             }
           } catch (fetchErr) {
             if (process.env.NODE_ENV === "development") {
-              console.warn(`[Axios] /api/auth/session fallback failed for ${config.url}:`, fetchErr);
+              console.warn(
+                `[Axios] /api/auth/session fallback failed for ${config.url}:`,
+                fetchErr
+              );
             }
           }
         }
@@ -153,83 +188,96 @@ api.interceptors.response.use(
 
     // Log network errors
     if (errorCode === "ERR_NETWORK" || !err.response) {
-      if (process.env.NODE_ENV === "development") {
-        console.error("[Axios Network Error]", {
-          code: errorCode,
-          message: err.message,
-          url: originalRequest?.url,
-          details: "Backend server is not responding.",
-        });
-      }
+      console.error("[Axios Network Error]", {
+        code: errorCode,
+        message: err.message,
+        url: originalRequest?.url,
+        baseURL: originalRequest?.baseURL,
+        details:
+          "Backend server is not responding. Check if the API server is running and ngrok tunnel is active.",
+      });
       return Promise.reject(err);
     }
 
-    // Handle 401 Unauthorized - Attempt refresh if not already retried
-    if (statusCode === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
-
-      if (process.env.NODE_ENV === "development") {
-        console.warn(`[Axios] 401 Unauthorized for ${originalRequest.url}. Attempting to refresh session...`);
-      }
-
-      try {
-        // Force refresh the session by calling the auth session endpoint
-        const resp = await fetch("/api/auth/session?update", {
-          method: "GET",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-        });
-
-        if (resp.ok) {
-          const sessionJson = await resp.json();
-          if (sessionJson?.accessToken) {
-            // Update the authorization header and retry the request
-            originalRequest.headers.Authorization = `Bearer ${sessionJson.accessToken}`;
-
-            if (process.env.NODE_ENV === "development") {
-              console.log(`[Axios] Session refreshed, retrying ${originalRequest.url}`);
-            }
-
-            return api(originalRequest);
-          }
-        }
-      } catch (refreshErr) {
-        if (process.env.NODE_ENV === "development") {
-          console.error("[Axios] Session refresh failed during 401 retry:", refreshErr);
-        }
-      }
-
-      // If refresh failed or no token received, proceed with normal 401 handling
+    // Handle 401 Unauthorized - NextAuth middleware will redirect to login
+    if (statusCode === 401) {
+      // Robustly determine if a token was present (not just header string)
       const rawAuth = originalRequest?.headers?.Authorization;
-      const hasToken = !!rawAuth && rawAuth.length > 15;
+      const tokenValue = rawAuth?.split?.(" ")?.[1];
+      const hasToken = !!tokenValue && tokenValue.length > 10;
+      console.warn(
+        `[Axios] 401 Unauthorized for ${originalRequest?.url} (Has Token: ${hasToken})`
+      );
 
-      const isOnAuthPage = typeof window !== "undefined" && window.location.pathname.startsWith("/auth");
+      const isOnAuthPage =
+        typeof window !== "undefined" &&
+        window.location.pathname.startsWith("/auth");
+
+      // Only show 'Session expired' if the client previously had a valid session
+      // to avoid spurious alerts during initial hydration.
       const clientHadSession = typeof window !== "undefined" && !!window._hadValidSession;
 
       if (!isOnAuthPage && hasToken && clientHadSession) {
+        // Prevent showing multiple "Session expired" notifications
         const now = Date.now();
-        if (!window._lastAuthErrorTime || now - window._lastAuthErrorTime > 5000) {
+          if (
+          !window._lastAuthErrorTime ||
+          now - window._lastAuthErrorTime > 5000
+        ) {
           window._lastAuthErrorTime = now;
+          // Log response body for debugging
+          try {
+            console.debug("[Axios] 401 response body:", err.response?.data);
+          } catch (e) {}
           notificationBus.emit({
             message: "Session expired. Please login again.",
             severity: "error",
           });
+
+          console.warn(
+            "[Axios] Session unauthorized. Notification shown. (Automatic signOut disabled to prevent loop)"
+          );
         }
-        if (typeof window !== "undefined") window._hadValidSession = false;
+        // Remove any localStorage fallback token to avoid repeated 401s
+        try {
+          if (typeof window !== "undefined") {
+            localStorage.removeItem("accessToken");
+            localStorage.removeItem("accessTokenExpiresAt");
+            // Reset the had-valid flag so we don't immediately re-show the notification
+            window._hadValidSession = false;
+          }
+        } catch (e) {
+          // ignore
+        }
+      } else if (!hasToken) {
+        console.warn(
+          "[Axios] Request failed with 401 but no token was present. Session might not be ready. Not signing out."
+        );
       }
     } else if (statusCode === 403) {
+      // Handle 403 Forbidden
       notificationBus.emit({
-        message: err.response?.data?.message || "You do not have permission to perform this action.",
+        message:
+          err.response?.data?.message ||
+          "You do not have permission to perform this action.",
         severity: "error",
       });
     } else if (errorCode !== "ERR_CANCELED") {
-      // Generic error handling
-      const msg = err.response?.data?.message || err.message || "An unexpected error occurred.";
+      // Generic error for others
+      const msg =
+        err.response?.data?.message ||
+        err.message ||
+        "An unexpected error occurred.";
+
+      // Prevent flooding with the same error message
       const errorKey = `err_${msg}`;
       const now = Date.now();
       if (!window._lastErrorMap) window._lastErrorMap = {};
 
-      if (!window._lastErrorMap[errorKey] || now - window._lastErrorMap[errorKey] > 3000) {
+      if (
+        !window._lastErrorMap[errorKey] ||
+        now - window._lastErrorMap[errorKey] > 3000
+      ) {
         window._lastErrorMap[errorKey] = now;
         notificationBus.emit({
           message: msg,
