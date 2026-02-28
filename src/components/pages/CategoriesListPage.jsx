@@ -18,7 +18,7 @@ const CategoriesListPage = () => {
     (async () => {
       try {
         showLoader();
-        const data = await CategoryService.getAll({ page: 1, limit: 200 });
+        const data = await CategoryService.getAll({ page: 1, limit: 1000 });
         const cats = data?.data || data || [];
         if (mounted) setCategories(cats);
       } catch (err) {

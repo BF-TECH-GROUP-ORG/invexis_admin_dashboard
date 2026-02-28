@@ -40,6 +40,7 @@ export default function CategoriesTable({
   onFilterChange,
 }) {
   const [categories, setCategories] = useState([]);
+  const [allCategories, setAllCategories] = useState([]); // For filters
   const [totalCount, setTotalCount] = useState(0);
   const [selected, setSelected] = useState([]);
   const dispatch = useDispatch();
@@ -47,7 +48,7 @@ export default function CategoriesTable({
     (s) => s.settings?.tables?.categories || {}
   );
   const page = tableSettings.page ?? 0;
-  const rowsPerPage = tableSettings.rowsPerPage ?? 5;
+  const rowsPerPage = tableSettings.rowsPerPage ?? 10; // Default to 10 for better UX
   const [search, setSearch] = useState("");
   const [levelFilter, setLevelFilter] = useState("");
   const [parentFilter, setParentFilter] = useState("");
@@ -111,14 +112,25 @@ export default function CategoriesTable({
           sort,
         });
 
-        const payload = response?.data ?? response ?? {};
+        // Log response for debugging pagination
+        if (process.env.NODE_ENV === "development") {
+          console.log("[CategoriesTable] API Response:", response);
+        }
+
+
+        const payload = response ?? {};
         const categoriesResult =
-          payload.categories ??
           payload.data ??
+          payload.categories ??
           (Array.isArray(payload) ? payload : []);
+
+        // More robust total count extraction
         const total =
+          payload.pagination?.totalItems ??
+          payload.pagination?.total ??
           payload.totalCount ??
           payload.total ??
+          payload.count ??
           (Array.isArray(categoriesResult) ? categoriesResult.length : 0);
 
         setCategories(categoriesResult);
@@ -136,23 +148,68 @@ export default function CategoriesTable({
     fetchCategories();
   }, [page, rowsPerPage, search, levelFilter, parentFilter, sort]);
 
+  // Fetch all categories once for the parent filter dropdown
+  useEffect(() => {
+    const fetchAllCategories = async () => {
+      try {
+        const response = await CategoryService.getCategories({
+          limit: 1000, // Large limit to get mostly everything for filters
+        });
+        const payload = response?.data ?? response ?? {};
+        const all = payload.categories ?? payload.data ?? (Array.isArray(payload) ? payload : []);
+        setAllCategories(all);
+      } catch (error) {
+        console.error("Failed to fetch all categories for filters:", error);
+      }
+    };
+    fetchAllCategories();
+  }, []);
+
   // Sync external filter props
   useEffect(() => {
     if (filterLevel !== undefined) setLevelFilter(filterLevel);
     if (filterParent !== undefined) setParentFilter(filterParent);
   }, [filterLevel, filterParent]);
 
+  // Sync filters to Redux
+  useEffect(() => {
+    try {
+      dispatch({
+        type: "settings/setTableFilters",
+        payload: {
+          tableId: "categories",
+          filters: { search, level: levelFilter, parent: parentFilter, sort },
+        },
+      });
+    } catch (e) {
+      console.error("Failed to sync category filters:", e);
+    }
+  }, [search, levelFilter, parentFilter, sort]);
+
   // Pagination handlers
   const handleChangePage = (event, newPage) => {
-    dispatch(setTablePagination({ table: "categories", page: newPage }));
+    dispatch(setTablePagination({ tableId: "categories", page: newPage }));
   };
 
   const handleChangeRowsPerPage = (event) => {
     const newRows = parseInt(event.target.value, 10);
     dispatch(
-      setTablePagination({ table: "categories", rowsPerPage: newRows, page: 0 })
+      setTablePagination({ tableId: "categories", rowsPerPage: newRows, page: 0 })
     );
   };
+
+  // Initialize table settings if not present
+  useEffect(() => {
+    if (!tableSettings.rowsPerPage) {
+      dispatch(
+        setTablePagination({
+          tableId: "categories",
+          rowsPerPage: 10,
+          page: 0,
+        })
+      );
+    }
+  }, []);
 
   // Row selection handlers
   const handleSelectAll = (event) => {
@@ -211,8 +268,11 @@ export default function CategoriesTable({
   };
 
   const getUniqueParents = () => {
-    const parents = categories.map((c) => c.parent).filter(Boolean);
-    return [...new Set(parents)];
+    // Collect unique parent names or IDs from all categories
+    const parents = allCategories
+      .map((c) => c.parentCategory?.name || c.parentCategory || c.parent)
+      .filter(Boolean);
+    return [...new Set(parents)].sort();
   };
 
   return (
@@ -440,7 +500,7 @@ export default function CategoriesTable({
             onPageChange={handleChangePage}
             rowsPerPage={rowsPerPage}
             onRowsPerPageChange={handleChangeRowsPerPage}
-            rowsPerPageOptions={[5, 10, 25]}
+            rowsPerPageOptions={[5, 10, 25, 50, 100]}
           />
         </Box>
       </Card>
