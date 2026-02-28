@@ -34,11 +34,11 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
   const { showNotification } = useNotification();
 
   // Categories state
-  const [categoriesList, setCategoriesList] = useState([]);
+  const [allCategories, setAllCategories] = useState([]);
+  const [activeL1, setActiveL1] = useState(null); // Tracks drill-down
   const [categorySearch, setCategorySearch] = useState("");
-  // Company admin user selection
-  const [companyAdminOptions, setCompanyAdminOptions] = useState([]);
   const [categoryStats, setCategoryStats] = useState({ level1: 0, level3: 0 });
+  const [companyAdminOptions, setCompanyAdminOptions] = useState([]);
 
   // Company Admins state
   const [companyAdmins, setCompanyAdmins] = useState([]);
@@ -69,13 +69,33 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
     });
   }, [adminSearch, companyAdmins]);
 
-  // Filtered categories
+  // Hierarchical Filtered Categories
   const filteredCategories = useMemo(() => {
-    if (!categorySearch) return categoriesList;
-    return categoriesList.filter((c) =>
-      c.name.toLowerCase().includes(categorySearch.toLowerCase())
-    );
-  }, [categorySearch, categoriesList]);
+    const searchLower = categorySearch.toLowerCase();
+
+    if (categorySearch) {
+      // If searching, show matching Level 2 categories globally for quick find
+      return allCategories.filter(
+        (c) =>
+          c.level === 2 &&
+          (c.name.toLowerCase().includes(searchLower) ||
+            c.parentCategory?.name?.toLowerCase().includes(searchLower))
+      );
+    }
+
+    if (activeL1) {
+      // Drilling down: Show L2s of the active L1
+      const l1Id = activeL1.id || activeL1._id;
+      return allCategories.filter((c) => {
+        const parentId =
+          c.parentCategory?.id || c.parentCategory?._id || c.parentCategory;
+        return c.level === 2 && parentId === l1Id;
+      });
+    }
+
+    // Default view: Show Level 1 categories
+    return allCategories.filter((c) => c.level === 1);
+  }, [categorySearch, allCategories, activeL1]);
 
   const selectedCountry = COUNTRIES.find((c) => c.name === formData.country);
   const selectedAdmin = companyAdmins.find(
@@ -135,39 +155,36 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
     return () => (mounted = false);
   }, []);
 
-  // Fetch categories (Level 2 only for selection)
+  // Fetch categories
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
-        // Fetch all categories to process relationships
         const data = await CategoryService.getAll({ page: 1, limit: 1000 });
-        const allCategories = data?.data || data || [];
+        const all = data?.data || data || [];
 
         if (mounted) {
-          // Filter for Level 2 categories for the selection list
-          const level2 = allCategories.filter((c) => c.level === 2);
-          setCategoriesList(level2);
-
-          // Store all categories to calculate stats later
-          window.allCategoriesCache = allCategories;
+          setAllCategories(all);
+          // Also set companyAdminOptions if not yet set (fix for line 40)
+          if (companyAdminOptions.length === 0 && companyAdmins.length > 0) {
+            setCompanyAdminOptions(companyAdmins);
+          }
         }
       } catch (e) {
         console.error("Failed to fetch categories", e);
       }
     })();
     return () => (mounted = false);
-  }, []);
+  }, [companyAdmins]);
 
   // Calculate stats when category selection changes
   useEffect(() => {
-    if (!window.allCategoriesCache) return;
+    if (allCategories.length === 0) return;
 
-    const allCats = window.allCategoriesCache;
     const selectedIds = formData.category_ids;
 
     // Find selected Level 2 categories
-    const selectedL2 = allCats.filter((c) =>
+    const selectedL2 = allCategories.filter((c) =>
       selectedIds.includes(c.id || c._id)
     );
 
@@ -182,7 +199,7 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
     );
 
     // Find related Level 3 (children of selected L2)
-    const relatedL3 = allCats.filter((c) => {
+    const relatedL3 = allCategories.filter((c) => {
       const parentId =
         c.parentCategory?.id || c.parentCategory?._id || c.parentCategory;
       return c.level === 3 && selectedIds.includes(parentId);
@@ -192,7 +209,7 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
       level1: relatedL1Ids.size,
       level3: relatedL3.length,
     });
-  }, [formData.category_ids]);
+  }, [formData.category_ids, allCategories]);
 
   const steps = [
     { id: 1, title: "Basic Info", fields: ["name", "domain", "email"] },
@@ -738,69 +755,125 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
                 {/* Step 4: Categories */}
                 {currentStep === 4 && (
                   <>
-                    <div>
-                      <label className="block text-sm font-semibold text-[#081422] mb-2">
-                        Select Categories (Level 2)
-                      </label>
-                      <div className="mb-4">
+                    <div className="space-y-4">
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <label className="block text-sm font-semibold text-[#081422]">
+                          {categorySearch
+                            ? "Search Results"
+                            : activeL1
+                              ? `Categories in ${activeL1.name}`
+                              : "Select Industry (Level 1)"}
+                        </label>
+                        {activeL1 && !categorySearch && (
+                          <button
+                            type="button"
+                            onClick={() => setActiveL1(null)}
+                            className="text-[#ff782d] text-sm font-medium flex items-center gap-1 hover:underline"
+                          >
+                            <ChevronLeft size={16} />
+                            Back to Industries
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="relative">
+                        <Search
+                          className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[#6b7280]"
+                          size={18}
+                        />
                         <input
                           type="text"
                           value={categorySearch}
                           onChange={(e) => setCategorySearch(e.target.value)}
-                          placeholder="Search categories..."
-                          className="w-full px-4 py-2 rounded-xl border-2 border-[#d1d5db] outline-none focus:border-[#ff782d] bg-white text-[#081422] placeholder-[#6b7280] text-sm"
+                          placeholder="Search all categories..."
+                          className="w-full pl-10 pr-4 py-2.5 rounded-xl border-2 border-[#d1d5db] outline-none focus:border-[#ff782d] bg-white text-[#081422] placeholder-[#6b7280] text-sm transition-all"
                         />
+                        {categorySearch && (
+                          <button
+                            type="button"
+                            onClick={() => setCategorySearch("")}
+                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-[#6b7280] hover:text-[#081422]"
+                          >
+                            <X size={16} />
+                          </button>
+                        )}
                       </div>
-                      <p className="text-xs text-[#6b7280] mb-3">
-                        Selecting a Level 2 category will automatically link
-                        related Level 1 and Level 3 categories.
+
+                      <p className="text-xs text-[#6b7280]">
+                        {categorySearch
+                          ? "Showing all relevant categories matching your search."
+                          : activeL1
+                            ? "Select Level 2 categories to link them to this company."
+                            : "Choose an industry to see more specific categories."}
                       </p>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-96 overflow-y-auto p-1">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-96 overflow-y-auto p-1 custom-scrollbar">
                         {filteredCategories.length === 0 && (
-                          <div className="col-span-2 text-center p-4 text-[#6b7280] border-2 border-dashed border-[#d1d5db] rounded-xl">
-                            {categoriesList.length === 0
-                              ? "No Level 2 categories available"
-                              : "No categories match your search"}
+                          <div className="col-span-2 text-center py-10 px-4 text-[#6b7280] border-2 border-dashed border-[#d1d5db] rounded-2xl bg-[#f9fafb]">
+                            <p>No categories found matching your criteria.</p>
                           </div>
                         )}
                         {filteredCategories.map((cat) => {
-                          const isSelected = formData.category_ids.includes(
-                            cat.id || cat._id
-                          );
+                          const id = cat.id || cat._id;
+                          const isLevel1 = cat.level === 1;
+                          const isSelected = formData.category_ids.includes(id);
+
                           return (
                             <div
-                              key={cat.id || cat._id}
+                              key={id}
                               onClick={() => {
-                                const id = cat.id || cat._id;
-                                const currentIds = [...formData.category_ids];
-                                if (isSelected) {
-                                  handleInputChange(
-                                    "category_ids",
-                                    currentIds.filter((i) => i !== id)
-                                  );
+                                if (isLevel1 && !categorySearch) {
+                                  setActiveL1(cat);
                                 } else {
-                                  handleInputChange("category_ids", [
-                                    ...currentIds,
-                                    id,
-                                  ]);
+                                  const currentIds = [...formData.category_ids];
+                                  if (isSelected) {
+                                    handleInputChange(
+                                      "category_ids",
+                                      currentIds.filter((i) => i !== id)
+                                    );
+                                  } else {
+                                    handleInputChange("category_ids", [
+                                      ...currentIds,
+                                      id,
+                                    ]);
+                                  }
                                 }
                               }}
-                              className={`p-4 rounded-xl border-2 cursor-pointer transition-all flex items-center justify-between ${isSelected
-                                ? "border-[#ff782d] bg-[#fff8f5]"
-                                : "border-[#d1d5db] hover:border-[#ff782d]"
+                              className={`p-4 rounded-xl border-2 cursor-pointer transition-all flex items-center justify-between group ${isSelected
+                                ? "border-[#ff782d] bg-[#fff8f5] shadow-sm"
+                                : "border-[#d1d5db] hover:border-[#ff782d] bg-white hover:bg-[#fffcfb]"
                                 }`}
                             >
-                              <span
-                                className={`font-medium ${isSelected
-                                  ? "text-[#ff782d]"
-                                  : "text-[#081422]"
-                                  }`}
-                              >
-                                {cat.name}
-                              </span>
-                              {isSelected && (
-                                <Check size={18} className="text-[#ff782d]" />
+                              <div className="flex flex-col">
+                                <span
+                                  className={`font-semibold text-sm ${isSelected ? "text-[#ff782d]" : "text-[#081422]"
+                                    }`}
+                                >
+                                  {cat.name}
+                                </span>
+                                {categorySearch && isLevel1 && (
+                                  <span className="text-[10px] uppercase tracking-wider text-[#6b7280] mt-0.5">
+                                    Industry
+                                  </span>
+                                )}
+                                {categorySearch && !isLevel1 && (
+                                  <span className="text-[10px] uppercase tracking-wider text-[#6b7280] mt-0.5">
+                                    {cat.parentCategory?.name || "Category"}
+                                  </span>
+                                )}
+                              </div>
+
+                              {isLevel1 && !categorySearch ? (
+                                <ChevronRight
+                                  size={18}
+                                  className="text-[#d1d5db] group-hover:text-[#ff782d] transition-colors"
+                                />
+                              ) : isSelected ? (
+                                <div className="bg-[#ff782d] rounded-full p-0.5">
+                                  <Check size={14} className="text-white" strokeWidth={3} />
+                                </div>
+                              ) : (
+                                <div className="w-5 h-5 rounded-full border-2 border-[#d1d5db] group-hover:border-[#ff782d]" />
                               )}
                             </div>
                           );
@@ -814,24 +887,24 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
                         </h4>
                         <div className="flex gap-6">
                           <div>
-                            <p className="text-xs text-[#6b7280] uppercase tracking-wider">
-                              Level 1 (Parents)
+                            <p className="text-[10px] text-[#6b7280] uppercase tracking-wider mb-1 font-bold">
+                              Industries
                             </p>
                             <p className="text-2xl font-bold text-[#ff782d]">
                               {categoryStats.level1}
                             </p>
                           </div>
                           <div>
-                            <p className="text-xs text-[#6b7280] uppercase tracking-wider">
-                              Level 2 (Selected)
+                            <p className="text-[10px] text-[#6b7280] uppercase tracking-wider mb-1 font-bold">
+                              Selected Categories
                             </p>
                             <p className="text-2xl font-bold text-[#081422]">
                               {formData.category_ids.length}
                             </p>
                           </div>
                           <div>
-                            <p className="text-xs text-[#6b7280] uppercase tracking-wider">
-                              Level 3 (Children)
+                            <p className="text-[10px] text-[#6b7280] uppercase tracking-wider mb-1 font-bold">
+                              Child Categories
                             </p>
                             <p className="text-2xl font-bold text-[#ff782d]">
                               {categoryStats.level3}
