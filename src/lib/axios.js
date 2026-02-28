@@ -1,5 +1,5 @@
 import axios from "axios";
-import { getSession } from "next-auth/react";
+import { getSession, signOut } from "next-auth/react";
 import { notificationBus } from "./notificationBus";
 
 // Use NEXT_PUBLIC_API_BASE_URL when available, otherwise use local proxy
@@ -164,6 +164,14 @@ api.interceptors.response.use(
       return Promise.reject(err);
     }
 
+    // Hard stop: never retry refresh endpoint to avoid infinite loops
+    if (originalRequest?.url?.includes("/auth/refresh")) {
+      if (typeof window !== "undefined") {
+        signOut({ callbackUrl: "/auth/login" });
+      }
+      return Promise.reject(err);
+    }
+
     // Handle 401 Unauthorized - Attempt refresh if not already retried
     if (statusCode === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
@@ -207,15 +215,10 @@ api.interceptors.response.use(
       const clientHadSession = typeof window !== "undefined" && !!window._hadValidSession;
 
       if (!isOnAuthPage && hasToken && clientHadSession) {
-        const now = Date.now();
-        if (!window._lastAuthErrorTime || now - window._lastAuthErrorTime > 5000) {
-          window._lastAuthErrorTime = now;
-          notificationBus.emit({
-            message: "Session expired. Please login again.",
-            severity: "error",
-          });
+        if (typeof window !== "undefined") {
+          window._hadValidSession = false;
+          signOut({ callbackUrl: "/auth/login" });
         }
-        if (typeof window !== "undefined") window._hadValidSession = false;
       }
     } else if (statusCode === 403) {
       notificationBus.emit({

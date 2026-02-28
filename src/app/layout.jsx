@@ -7,6 +7,7 @@ import NotificationProvider from "@/providers/NotificationProvider";
 import LoadingProvider from "@/providers/LoadingProvider";
 import NextAuthProvider from "@/providers/NextAuthProvider";
 import WebSocketProvider from "@/providers/WebSocketProvider";
+import { PushProvider } from "@/providers/PushProvider";
 
 export const metadata = {
   title: {
@@ -14,19 +15,26 @@ export const metadata = {
     template: "%s | Invexis",
   },
   description: "Invexis Admin Dashboard",
+  icons: {
+    icon: "/favicon.svg",
+    shortcut: "/favicon.svg",
+    apple: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body className={`font-metropolis antialiased`}>
+      <body className={`font-metropolis antialiased`} suppressHydrationWarning>
         <NextAuthProvider>
           <ClientProviders>
             <WebSocketProvider>
               <ThemeRegistry>
                 <LoadingProvider>
                   <NotificationProvider>
-                    <ProtectedRoute>{children}</ProtectedRoute>
+                    <PushProvider>
+                      <ProtectedRoute>{children}</ProtectedRoute>
+                    </PushProvider>
                   </NotificationProvider>
                 </LoadingProvider>
               </ThemeRegistry>

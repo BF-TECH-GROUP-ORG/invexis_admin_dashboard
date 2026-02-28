@@ -148,75 +148,78 @@ export default function TopNavBar({ expanded = true }) {
     <>
       {/* ======= TOP NAVBAR ======= */}
       <header
-        className={`fixed top-0 right-0 z-40 flex items-center justify-between px-6 py-4 bg-white/80 backdrop-blur-sm border-b border-gray-200 transition-all duration-300 ease-in-out`}
+        className={`fixed top-0 right-0 z-40 flex items-center justify-between px-4 md:px-6 h-16 bg-white/80 backdrop-blur-md border-b border-gray-200 transition-all duration-300 ease-in-out`}
         style={{
-          left: expanded ? "16rem" : "5rem",
-          width: expanded ? "calc(100% - 16rem)" : "calc(100% - 5rem)",
+          left: expanded ? "280px" : "72px",
+          width: expanded ? "calc(100% - 280px)" : "calc(100% - 72px)",
         }}
       >
-        {/* Left Section - Logo */}
-        <div className="flex items-center gap-3 min-w-0 flex-shrink-0">
-          <span className="font-bold text-lg text-gray-950 whitespace-nowrap">
-            INVEX<span className="text-orange-500 font-extrabold">iS</span>
-          </span>
+        {/* Left Section - Icon only on mobile */}
+        <div className="flex items-center gap-3 min-w-0 flex-shrink-0 md:hidden">
+          <img src="/favicon.svg" alt="Logo" className="h-9 w-9" />
         </div>
 
-        {/* Middle Section - Search Bar */}
-        <div className="flex-1 mx-6">
-          <div className="relative w-3/5 mx-auto">
+        {/* Middle Section - Modern Search Bar */}
+        <div className="flex-1 max-w-2xl mx-8 hidden md:block">
+          <div className="relative group">
             <input
               type="text"
-              placeholder="Search..."
-              className="w-full pl-12 pr-4 py-3 rounded-full bg-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 transition"
+              placeholder="Search anything..."
+              className="w-full pl-12 pr-4 py-2.5 rounded-2xl bg-gray-100/80 border border-transparent focus:bg-white focus:border-orange-300 focus:ring-4 focus:ring-orange-500/10 text-sm transition-all outline-none"
               aria-label="Search"
             />
-            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-orange-500 transition-colors" />
           </div>
         </div>
 
         {/* Right Section - Icons and Profile */}
         <div className="flex items-center gap-6 flex-shrink-0">
           {/* Notifications */}
-          <div className="relative">
-            <button
-              className="relative p-3 rounded-full border-2 border-gray-200 hover:border-orange-300 transition"
-              onClick={() => setNotifOpen((s) => !s)}
-              aria-label="Notifications"
-            >
-              <Bell className="w-6 h-6 text-gray-600 hover:text-orange-500" />
-              {unreadCount > 0 && (
-                <span className="absolute -top-0.5 -right-[-1.5px] min-w-[0.7rem] h-[11px] w-3 px-0.5 flex items-center justify-center text-[10px] bg-red-500 text-white rounded-full"></span>
-              )}
-            </button>
-          </div>
+          <button
+            className="relative p-2.5 rounded-xl border border-gray-200 bg-white hover:border-orange-300 hover:bg-orange-50/50 transition-all group"
+            onClick={() => setNotifOpen((s) => !s)}
+            aria-label="Notifications"
+          >
+            <Bell className="w-5 h-5 md:w-6 md:h-6 text-gray-600 group-hover:text-orange-500 transition-colors" />
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[18px] h-[18px] px-1 bg-orange-500 text-white text-[10px] font-bold rounded-full ring-2 ring-white animate-in zoom-in duration-300">
+                {unreadCount > 99 ? "99+" : unreadCount}
+              </span>
+            )}
+          </button>
+
+          <div className="h-8 w-[1px] bg-gray-200 hidden md:block" />
 
           {/* Profile Section */}
           <button
             onClick={() => setProfileOpen(true)}
-            className="flex items-center gap-3 hover:opacity-80 transition group"
+            className="flex items-center gap-3 p-1.5 pl-1.5 pr-3 rounded-2xl border border-transparent hover:border-gray-200 hover:bg-gray-50/50 transition-all group active:scale-95"
           >
-            <Image
-              src={
-                displayUser.profilePicture ||
-                displayUser.profileImage ||
-                "/images/user3.jpg"
-              }
-              alt={displayName}
-              width={48}
-              height={48}
-              className="w-10 h-10 rounded-full border-2 border-gray-100 group-hover:border-[#ff782d] transition-colors object-cover"
-            />
-            <div className="flex flex-col items-start">
-              <p className="text-sm font-bold text-gray-900 group-hover:text-[#ff782d] transition-colors">
+            <div className="relative">
+              <Image
+                src={
+                  displayUser.profilePicture ||
+                  displayUser.profileImage ||
+                  "/images/user3.jpg"
+                }
+                alt={displayName}
+                width={40}
+                height={40}
+                className="w-10 h-10 rounded-full border-2 border-white group-hover:border-orange-200 shadow-sm object-cover"
+              />
+              <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 border-2 border-white rounded-full"></div>
+            </div>
+            <div className="hidden lg:flex flex-col items-start translate-y-[1px]">
+              <p className="text-sm font-bold text-gray-900 group-hover:text-orange-600 transition-colors leading-tight">
                 {displayName}
               </p>
-              <p className="text-xs text-gray-400 font-medium">
-                {displayUser.email}
+              <p className="text-[11px] text-gray-500 font-semibold uppercase tracking-tight opacity-70">
+                {user?.role || "Admin"}
               </p>
             </div>
             <ChevronDown
               size={16}
-              className="text-gray-400 group-hover:text-[#ff782d] transition-colors"
+              className="text-gray-400 group-hover:text-orange-500 transition-all hidden md:block"
             />
           </button>
         </div>

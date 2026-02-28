@@ -33,7 +33,7 @@ function PasswordField({ field, isPassword }) {
       <TextField
         name={field.name}
         label={field.label}
-        type={isPassword && !showPassword ? "password" : field.type}
+        type={isPassword ? (showPassword ? "text" : "password") : field.type}
         value={field.value}
         onChange={field.onChange}
         required={field.required}
@@ -85,10 +85,10 @@ export default function FormWrapper({
   error = null,
   success = null,
   showTerms = false, // NEW → show checkbox dynamically
-  onAcceptTerms = () => {},
+  onAcceptTerms = () => { },
   acceptedTerms = false,
 }) {
-  const [showPassword, setShowPassword] = useState(false);
+
 
   return (
     <div className="w-full max-w-md p-8 rounded-2xl bg-white dark:bg-zinc-900">
@@ -220,11 +220,11 @@ export default function FormWrapper({
               overflow: "hidden"
             }}
           >
-             <Image 
-              src={googleIcon} 
-              alt="Google" 
-              width={24} 
-              height={24} 
+            <Image
+              src={googleIcon}
+              alt="Google"
+              width={24}
+              height={24}
               className="object-contain"
             />
           </IconButton>

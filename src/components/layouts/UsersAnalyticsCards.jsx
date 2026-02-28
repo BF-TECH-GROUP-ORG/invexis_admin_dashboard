@@ -4,13 +4,13 @@ import { Users, UserCheck, UserX, Briefcase } from "lucide-react";
 
 export default function UsersAnalyticsCardsNew({
   users = [],
-  onFilter = () => {},
+  onFilter = () => { },
   activeFilters = {},
 }) {
   const totalUsers = users.length;
-  const activeUsers = users.filter((u) => u.active).length;
+  const activeUsers = users.filter((u) => u.accountStatus === "active").length;
   const companyAdmins = users.filter((u) => u.role === "company_admin").length;
-  const inactiveUsers = users.filter((u) => !u.active).length;
+  const suspendedUsers = users.filter((u) => u.accountStatus === "suspended" || u.accountStatus === false).length;
 
   const cards = [
     {
@@ -41,13 +41,13 @@ export default function UsersAnalyticsCardsNew({
       description: "Admins with company access",
     },
     {
-      key: "inactive",
-      title: "Inactive Users",
-      value: inactiveUsers,
+      key: "suspended",
+      title: "Suspended Users",
+      value: suspendedUsers,
       icon: UserX,
       color: "#ef4444",
       bgColor: "#fff1f2",
-      description: "Users currently inactive",
+      description: "Users currently suspended",
     },
   ];
 
@@ -55,7 +55,7 @@ export default function UsersAnalyticsCardsNew({
     if (key === "total") return !activeFilters.role && !activeFilters.status;
     if (key === "active") return activeFilters.status === "active";
     if (key === "company_admin") return activeFilters.role === "company_admin";
-    if (key === "inactive") return activeFilters.status === "inactive";
+    if (key === "suspended") return activeFilters.status === "suspended";
     return false;
   };
 
@@ -69,7 +69,7 @@ export default function UsersAnalyticsCardsNew({
     if (card.key === "total") onFilter({ role: "", status: "" });
     if (card.key === "active") onFilter({ status: "active" });
     if (card.key === "company_admin") onFilter({ role: "company_admin" });
-    if (card.key === "inactive") onFilter({ status: "inactive" });
+    if (card.key === "suspended") onFilter({ status: "suspended" });
   };
 
   return (
@@ -89,9 +89,8 @@ export default function UsersAnalyticsCardsNew({
               }
             }}
             onClick={() => handleClick(card)}
-            className={`border-2 rounded-2xl p-5 bg-white hover:border-[#ff782d] transition-all cursor-pointer ${
-              active ? "border-[#ff782d] shadow-sm" : "border-[#d1d5db]"
-            }`}
+            className={`border-2 rounded-2xl p-5 bg-white hover:border-[#ff782d] transition-all cursor-pointer ${active ? "border-[#ff782d] shadow-sm" : "border-[#d1d5db]"
+              }`}
           >
             <div className="flex items-start justify-between">
               <div>

@@ -68,6 +68,8 @@ export default function CompaniesTable() {
 
   // Direct API state instead of useHybridQuery
   const [companies, setCompanies] = useState([]);
+  const [allCompanies, setAllCompanies] = useState([]); // For analytics cards
+  const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -77,15 +79,29 @@ export default function CompaniesTable() {
       setLoading(true);
       setError(null);
       try {
-        const params = {};
+        // Fetch paginated companies for the table
+        const params = {
+          limit: rowsPerPage || 10,
+          page: page + 1, // API usually expects 1-based page
+        };
         if (tierFilter) params.tier = tierFilter;
         if (statusFilter) params.status = statusFilter;
         if (countryFilter) params.country = countryFilter;
-        params.limit = rowsPerPage || 50;
-        params.offset = page * (rowsPerPage || 50);
+        if (search) params.search = search;
 
-        const data = await CompanyService.getAll(params);
-        setCompanies(data?.data || data || []);
+        const res = await CompanyService.getAll(params);
+
+        // Extract data and pagination info
+        const data = res?.data || (Array.isArray(res) ? res : []);
+        const total = res?.pagination?.totalItems || res?.total || data.length;
+
+        setCompanies(data);
+        setTotalCount(total);
+
+        // Also fetch all companies for analytics cards (one-time or when status changes)
+        // We use a large limit to get the full list for stats
+        const allRes = await CompanyService.getAll({ limit: 1000 });
+        setAllCompanies(allRes?.data || (Array.isArray(allRes) ? allRes : []));
       } catch (err) {
         console.error("Failed to fetch companies:", err);
         setError(err.message);
@@ -143,7 +159,7 @@ export default function CompaniesTable() {
         },
       });
     } catch (e) { }
-  }, [search, tierFilter, statusFilter, countryFilter]);
+  }, [tierFilter, statusFilter, countryFilter, search]);
 
   const handleSelectAll = (e) => {
     if (e.target.checked) {
@@ -313,7 +329,7 @@ export default function CompaniesTable() {
 
   return (
     <>
-      <CompaniesAnalyticsCards companies={filteredCompanies} />
+      <CompaniesAnalyticsCards companies={allCompanies} />
 
       {loading && (
         <Box px={2.5} py={2}>
@@ -754,12 +770,12 @@ export default function CompaniesTable() {
 
           <TablePagination
             component="div"
-            count={filteredCompanies.length}
+            count={totalCount}
             page={page}
             onPageChange={handleChangePage}
             rowsPerPage={rowsPerPage}
             onRowsPerPageChange={handleChangeRowsPerPage}
-            rowsPerPageOptions={[5, 10, 25]}
+            rowsPerPageOptions={[5, 10, 25, 50]}
           />
         </Box>
       </Card>

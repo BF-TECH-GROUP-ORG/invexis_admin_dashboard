@@ -83,7 +83,7 @@ export default function UsersListTable() {
           filters: { search, roleFilter, statusFilter },
         },
       });
-    } catch (e) {}
+    } catch (e) { }
   }, [search, roleFilter, statusFilter]);
 
   const filteredUsers = useMemo(() => {
@@ -99,7 +99,10 @@ export default function UsersListTable() {
         (u.position || "").toLowerCase().includes(q);
       const matchesRole = !roleFilter || u.role === roleFilter;
       const matchesStatus =
-        !statusFilter || (statusFilter === "active" ? u.active : !u.active);
+        !statusFilter ||
+        (statusFilter === "suspended"
+          ? u.accountStatus === "suspended" || u.accountStatus === false
+          : u.accountStatus === statusFilter);
       return matchesSearch && matchesRole && matchesStatus;
     });
   }, [users, search, roleFilter, statusFilter]);
@@ -141,19 +144,32 @@ export default function UsersListTable() {
   };
 
   const handleToggleActive = async (id, currentStatus) => {
-    // TODO: Implement API call to toggle status if endpoint exists
-    // Manual refresh of data after status change
     try {
-      await UserService.update(id, { active: !currentStatus });
+      const user = users.find((u) => (u.id || u._id) === id);
+      if (!user) return;
+
+      const newStatus = currentStatus === "active" ? "suspended" : "active";
+
+      const payload = {
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+        accountStatus: newStatus,
+      };
+
+      await UserService.update(id, payload);
       showNotification({ message: "User status updated", severity: "success" });
-      // Refetch users to update the list
-      const res = await UserService.getCompanyAdmins();
-      const userData = res.users || res.data || (Array.isArray(res) ? res : []);
-      setUsers(userData);
+
+      // Update local state directly for immediate feedback
+      setUsers((prev) =>
+        prev.map((u) =>
+          (u.id || u._id) === id ? { ...u, accountStatus: newStatus } : u
+        )
+      );
     } catch (err) {
       console.error("Failed to update status", err);
       showNotification({
-        message: "Failed to update status",
+        message: err.message || "Failed to update status",
         severity: "error",
       });
     }
@@ -267,7 +283,7 @@ export default function UsersListTable() {
           >
             <MenuItem value="">All Status</MenuItem>
             <MenuItem value="active">Active</MenuItem>
-            <MenuItem value="inactive">Inactive</MenuItem>
+            <MenuItem value="suspended">Suspended</MenuItem>
           </Select>
         </Box>
 
@@ -414,7 +430,7 @@ export default function UsersListTable() {
 
                         <TableCell>
                           <IOSSwitch
-                            checked={Boolean(u?.accountStatus)}
+                            checked={u?.accountStatus === "active"}
                             onChange={() =>
                               handleToggleActive(userId, u.accountStatus)
                             }
