@@ -14,6 +14,7 @@ import {
   ListItemText,
   Link,
   TextField,
+  Chip,
 } from "@mui/material";
 import CompanyService from "@/services/CompanyService";
 import CategoryService from "@/services/CategoryService";
@@ -128,29 +129,67 @@ export default function CompanyDetailsModal({ open, onClose, companyId }) {
         {!company && <Typography>Loading...</Typography>}
         {company && (
           <Box>
-            <Typography variant="h6">{company.name}</Typography>
-            <Typography variant="body2" color="text.secondary">
-              {company.domain}
-            </Typography>
+            <Box display="flex" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={1}>
+              <Box>
+                <Typography variant="h6">{company.name}</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {company.domain || "No domain set"}
+                </Typography>
+              </Box>
+              <Chip
+                label={`MODE: ${(company.business_type || "HYBRID").toUpperCase()}`}
+                sx={{
+                  backgroundColor: company.business_type === "RETAIL" ? "#E0F2FE" : company.business_type === "INDUSTRIAL" ? "#FFEDD5" : "#F3E8FF",
+                  color: company.business_type === "RETAIL" ? "#0369A1" : company.business_type === "INDUSTRIAL" ? "#C2410C" : "#7E22CE",
+                  fontWeight: 700,
+                }}
+              />
+            </Box>
 
             <Box mt={2}>
               <Typography variant="subtitle2">Contact</Typography>
-              <Typography>{company.email || "-"}</Typography>
-              <Typography>{company.phone || "-"}</Typography>
-              <Typography>
-                {company.country || "-"}{" "}
-                {company.city ? `, ${company.city}` : ""}
+              <Typography variant="body2">Email: {company.email || "-"}</Typography>
+              <Typography variant="body2">Phone: {company.phone || "-"}</Typography>
+              <Typography variant="body2">
+                Location: {company.country || "-"} {company.city ? `, ${company.city}` : ""}
               </Typography>
             </Box>
 
-            <Box mt={2}>
-              <Typography variant="subtitle2">Tier</Typography>
-              <Typography>{company.tier}</Typography>
+            <Box mt={2} display="flex" gap={3}>
+              <Box>
+                <Typography variant="subtitle2">Tier</Typography>
+                <Typography variant="body2">{company.tier || "Basic"}</Typography>
+              </Box>
+              <Box>
+                <Typography variant="subtitle2">Status</Typography>
+                <Typography variant="body2">{company.status}</Typography>
+              </Box>
             </Box>
 
+            {/* Payment Phones */}
             <Box mt={2}>
-              <Typography variant="subtitle2">Status</Typography>
-              <Typography>{company.status}</Typography>
+              <Typography variant="subtitle2">Payment Phones (Mobile Money)</Typography>
+              {(() => {
+                let phones = [];
+                if (Array.isArray(company.payment_phones)) phones = company.payment_phones;
+                else if (typeof company.payment_phones === "string") {
+                  try { phones = JSON.parse(company.payment_phones); } catch (e) {}
+                }
+                if (phones.length === 0) return <Typography variant="body2" color="text.secondary">None registered</Typography>;
+                return (
+                  <Box display="flex" gap={1} flexWrap="wrap" mt={0.5}>
+                    {phones.map((p, idx) => (
+                      <Chip
+                        key={idx}
+                        label={`${p.provider || 'MTN'}: ${p.phoneNumber}`}
+                        size="small"
+                        variant="outlined"
+                        color={p.enabled !== false ? "primary" : "default"}
+                      />
+                    ))}
+                  </Box>
+                );
+              })()}
             </Box>
 
             <Box mt={3}>

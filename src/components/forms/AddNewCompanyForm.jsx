@@ -15,6 +15,7 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState({
     name: "",
+    business_type: "HYBRID",
     domain: "",
     email: "",
     phone: "",
@@ -23,8 +24,7 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
     tier: "",
     company_admin_id: "",
     category_ids: [],
-    industry: "",
-    size: "",
+    payment_phones: [],
     notificationsEmail: true,
     notificationsSms: true,
     notificationsInApp: true,
@@ -85,10 +85,22 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
   // If editing, populate form with initial data
   useEffect(() => {
     if (initialData) {
+      let parsedPhones = [];
+      if (Array.isArray(initialData.payment_phones)) {
+        parsedPhones = initialData.payment_phones;
+      } else if (typeof initialData.payment_phones === "string") {
+        try {
+          parsedPhones = JSON.parse(initialData.payment_phones);
+        } catch (e) {
+          parsedPhones = [];
+        }
+      }
+
       setFormData((prev) => ({
         ...prev,
         admin_user_ids: initialData?.admin_user_ids || [],
         name: initialData.name || "",
+        business_type: initialData.business_type || "HYBRID",
         domain: initialData.domain || "",
         email: initialData.email || "",
         phone: initialData.phone || "",
@@ -97,8 +109,7 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
         tier: initialData.tier ?? "",
         company_admin_id: initialData.company_admin_id || "",
         category_ids: initialData.category_ids || [],
-        industry: initialData.metadata?.industry || "",
-        size: initialData.metadata?.size || "",
+        payment_phones: parsedPhones,
         notificationsEmail: initialData.notification_preferences?.email ?? true,
         notificationsSms: initialData.notification_preferences?.sms ?? true,
         notificationsInApp: initialData.notification_preferences?.inApp ?? true,
@@ -199,10 +210,10 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
     { id: 2, title: "Contact Details", fields: ["phone", "country", "city"] },
     { id: 3, title: "Company Admin", fields: ["company_admin_id"] },
     { id: 4, title: "Categories", fields: ["category_ids"] },
-    { id: 5, title: "Plan & Details", fields: ["tier", "industry", "size"] },
+    { id: 5, title: "Plan Selection", fields: ["tier"] },
     {
       id: 6,
-      title: "Notifications",
+      title: "Notifications & Payment",
       fields: ["notificationsEmail", "notificationsSms", "notificationsInApp"],
     },
   ];
@@ -276,6 +287,7 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
 
     const payload = {
       name: formData.name,
+      business_type: formData.business_type || "HYBRID",
       domain: formData.domain || null,
       email: formData.email || null,
       phone: formData.phone || null,
@@ -284,10 +296,7 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
       tier: formData.tier || null,
       company_admin_id: formData.company_admin_id || null,
       category_ids: formData.category_ids || [],
-      metadata: {
-        industry: formData.industry || null,
-        size: formData.size || null,
-      },
+      payment_phones: formData.payment_phones || [],
       notification_preferences: {
         email: formData.notificationsEmail,
         sms: formData.notificationsSms,
@@ -402,7 +411,7 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
                         onChange={(e) =>
                           handleInputChange("domain", e.target.value)
                         }
-                        placeholder="e.g., techhub-rw-1763386831.com"
+                        placeholder="e.g., techhub.rw"
                         className={`w-full px-4 py-3 rounded-2xl border-2 outline-none transition-all focus:border-[#ff782d] ${errors.domain
                           ? "border-red-500"
                           : "border-[#d1d5db] hover:border-[#ff782d]"
@@ -413,6 +422,51 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
                           {errors.domain}
                         </p>
                       )}
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-[#081422] mb-2">
+                        Business Operational Mode
+                      </label>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        {[
+                          {
+                            key: "HYBRID",
+                            title: "HYBRID",
+                            desc: "Manages both Sales & Full Inventory",
+                          },
+                          {
+                            key: "RETAIL",
+                            title: "RETAIL",
+                            desc: "Point of Sale & Direct Sales Focus",
+                          },
+                          {
+                            key: "INDUSTRIAL",
+                            title: "INDUSTRIAL",
+                            desc: "Manufacturing & Material Assets",
+                          },
+                        ].map((mode) => (
+                          <div
+                            key={mode.key}
+                            onClick={() => handleInputChange("business_type", mode.key)}
+                            className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${
+                              formData.business_type === mode.key
+                                ? "border-[#ff782d] bg-[#fff8f5]"
+                                : "border-[#d1d5db] hover:border-[#ff782d]"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="font-bold text-[#081422] text-sm">
+                                {mode.title}
+                              </span>
+                              {formData.business_type === mode.key && (
+                                <Check size={16} className="text-[#ff782d]" />
+                              )}
+                            </div>
+                            <p className="text-xs text-[#6b7280]">{mode.desc}</p>
+                          </div>
+                        ))}
+                      </div>
                     </div>
 
                     <div>
@@ -887,56 +941,6 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
                         </p>
                       )}
                     </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
-                      <div>
-                        <label className="block text-sm font-semibold text-[#081422] mb-2">
-                          Industry
-                        </label>
-                        <input
-                          type="text"
-                          value={formData.industry}
-                          onChange={(e) =>
-                            handleInputChange("industry", e.target.value)
-                          }
-                          placeholder="e.g., Technology"
-                          className={`w-full px-4 py-3 rounded-2xl border-2 outline-none transition-all focus:border-[#ff782d] ${errors.industry
-                            ? "border-red-500"
-                            : "border-[#d1d5db] hover:border-[#ff782d]"
-                            } bg-white text-[#081422] placeholder-[#6b7280]`}
-                        />
-                        {errors.industry && (
-                          <p className="text-red-500 text-sm mt-1">
-                            {errors.industry}
-                          </p>
-                        )}
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-semibold text-[#081422] mb-2">
-                          Company Size
-                        </label>
-                        <select
-                          value={formData.size}
-                          onChange={(e) =>
-                            handleInputChange("size", e.target.value)
-                          }
-                          className="w-full px-4 py-3 rounded-2xl border-2 border-[#d1d5db] bg-white text-[#081422] outline-none focus:border-[#ff782d]"
-                        >
-                          <option value="">Select company size</option>
-                          <option value="1-10">1-10 employees</option>
-                          <option value="11-50">11-50 employees</option>
-                          <option value="51-100">51-100 employees</option>
-                          <option value="100-500">100-500 employees</option>
-                          <option value="500+">500+ employees</option>
-                        </select>
-                        {errors.size && (
-                          <p className="text-red-500 text-sm mt-1">
-                            {errors.size}
-                          </p>
-                        )}
-                      </div>
-                    </div>
                   </>
                 )}
 
@@ -999,6 +1003,100 @@ const AddNewCompanyForm = ({ initialData = null, onSuccess = null }) => {
                           </span>
                         </label>
                       </div>
+                    </div>
+
+                    <div className="mt-8">
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <label className="block text-sm font-semibold text-[#081422]">
+                            Payment Phones (Mobile Money)
+                          </label>
+                          <p className="text-xs text-[#6b7280]">
+                            Add mobile money phone numbers for automated company transactions
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newPhone = {
+                              phoneNumber: "",
+                              provider: "MTN",
+                              enabled: true,
+                            };
+                            setFormData((prev) => ({
+                              ...prev,
+                              payment_phones: [...(prev.payment_phones || []), newPhone],
+                            }));
+                          }}
+                          className="px-3 py-1.5 bg-[#ff782d] text-white text-xs font-semibold rounded-xl hover:bg-[#ff6b1a] transition-all"
+                        >
+                          + Add Phone
+                        </button>
+                      </div>
+
+                      {(formData.payment_phones || []).length === 0 ? (
+                        <div className="p-4 rounded-2xl border-2 border-dashed border-[#d1d5db] text-center text-xs text-[#6b7280]">
+                          No payment phone numbers added yet. Click "+ Add Phone" above.
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {formData.payment_phones.map((phoneItem, idx) => (
+                            <div
+                              key={idx}
+                              className="flex items-center gap-3 p-3 rounded-2xl border-2 border-[#d1d5db] bg-[#f9fafb]"
+                            >
+                              <input
+                                type="text"
+                                value={phoneItem.phoneNumber || ""}
+                                onChange={(e) => {
+                                  const updated = [...formData.payment_phones];
+                                  updated[idx] = { ...updated[idx], phoneNumber: e.target.value };
+                                  setFormData((prev) => ({ ...prev, payment_phones: updated }));
+                                }}
+                                placeholder="e.g., 0788123456"
+                                className="flex-1 px-3 py-2 rounded-xl border border-[#d1d5db] text-xs outline-none focus:border-[#ff782d] bg-white text-[#081422]"
+                              />
+                              <select
+                                value={phoneItem.provider || "MTN"}
+                                onChange={(e) => {
+                                  const updated = [...formData.payment_phones];
+                                  updated[idx] = { ...updated[idx], provider: e.target.value };
+                                  setFormData((prev) => ({ ...prev, payment_phones: updated }));
+                                }}
+                                className="px-3 py-2 rounded-xl border border-[#d1d5db] text-xs outline-none focus:border-[#ff782d] bg-white text-[#081422]"
+                              >
+                                <option value="MTN">MTN</option>
+                                <option value="Airtel">Airtel</option>
+                                <option value="MPESA">MPESA</option>
+                                <option value="Other">Other</option>
+                              </select>
+                              <label className="flex items-center gap-1.5 text-xs text-[#081422] cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={phoneItem.enabled !== false}
+                                  onChange={(e) => {
+                                    const updated = [...formData.payment_phones];
+                                    updated[idx] = { ...updated[idx], enabled: e.target.checked };
+                                    setFormData((prev) => ({ ...prev, payment_phones: updated }));
+                                  }}
+                                  className="accent-[#ff782d]"
+                                />
+                                Active
+                              </label>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updated = formData.payment_phones.filter((_, i) => i !== idx);
+                                  setFormData((prev) => ({ ...prev, payment_phones: updated }));
+                                }}
+                                className="p-1.5 text-red-500 hover:text-red-700 transition-colors"
+                              >
+                                <X size={16} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </>
                 )}

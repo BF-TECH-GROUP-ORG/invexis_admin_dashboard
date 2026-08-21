@@ -63,6 +63,7 @@ export default function CompaniesTable() {
   const [countryFilter, setCountryFilter] = useState(
     tableFilters.countryFilter || ""
   );
+  const [modeFilter, setModeFilter] = useState("");
   const page = tableSettings.page ?? 0;
   const rowsPerPage = tableSettings.rowsPerPage ?? 5;
 
@@ -109,19 +110,22 @@ export default function CompaniesTable() {
 
   const filteredCompanies = useMemo(() => {
     return companies.filter((c) => {
+      const mode = (c.business_type || "HYBRID").toUpperCase();
       const matchesSearch =
         c.name?.toLowerCase().includes(search.toLowerCase()) ||
         c.email?.toLowerCase().includes(search.toLowerCase()) ||
         c.city?.toLowerCase().includes(search.toLowerCase()) ||
         c.tier?.toLowerCase().includes(search.toLowerCase()) ||
-        c.industry?.toLowerCase().includes(search.toLowerCase());
+        c.industry?.toLowerCase().includes(search.toLowerCase()) ||
+        mode.toLowerCase().includes(search.toLowerCase());
       const matchesTier =
         !tierFilter || c.tier?.toLowerCase() === tierFilter.toLowerCase();
       const matchesStatus = !statusFilter || c.status === statusFilter;
       const matchesCountry = !countryFilter || c.country === countryFilter;
-      return matchesSearch && matchesTier && matchesStatus && matchesCountry;
+      const matchesMode = !modeFilter || mode === modeFilter.toUpperCase();
+      return matchesSearch && matchesTier && matchesStatus && matchesCountry && matchesMode;
     });
-  }, [companies, search, tierFilter, statusFilter, countryFilter]);
+  }, [companies, search, tierFilter, statusFilter, countryFilter, modeFilter]);
 
   useEffect(() => {
     try {
@@ -389,6 +393,19 @@ export default function CompaniesTable() {
 
           <Select
             size="small"
+            value={modeFilter}
+            onChange={(e) => setModeFilter(e.target.value)}
+            displayEmpty
+            sx={{ minWidth: 130 }}
+          >
+            <MenuItem value="">All Modes</MenuItem>
+            <MenuItem value="HYBRID">Hybrid</MenuItem>
+            <MenuItem value="RETAIL">Retail</MenuItem>
+            <MenuItem value="INDUSTRIAL">Industrial</MenuItem>
+          </Select>
+
+          <Select
+            size="small"
             value={countryFilter}
             onChange={(e) => setCountryFilter(e.target.value)}
             displayEmpty
@@ -428,6 +445,7 @@ export default function CompaniesTable() {
                     />
                   </TableCell>
                   <TableCell>Name</TableCell>
+                  <TableCell>Mode</TableCell>
                   <TableCell>Email</TableCell>
                   <TableCell>Phone</TableCell>
                   <TableCell>Country</TableCell>
@@ -486,6 +504,33 @@ export default function CompaniesTable() {
                             </Typography>
                           </Box>
                         </Box>
+                      </TableCell>
+
+                      <TableCell>
+                        {(() => {
+                          const mode = (company.business_type || "HYBRID").toUpperCase();
+                          let bg = "#F3E8FF";
+                          let color = "#7E22CE";
+                          if (mode === "RETAIL") {
+                            bg = "#E0F2FE";
+                            color = "#0369A1";
+                          } else if (mode === "INDUSTRIAL") {
+                            bg = "#FFEDD5";
+                            color = "#C2410C";
+                          }
+                          return (
+                            <Chip
+                              label={mode}
+                              size="small"
+                              sx={{
+                                backgroundColor: bg,
+                                color: color,
+                                fontWeight: 700,
+                                fontSize: "0.7rem",
+                              }}
+                            />
+                          );
+                        })()}
                       </TableCell>
 
                       <TableCell>{company.email}</TableCell>
