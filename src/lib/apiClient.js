@@ -74,31 +74,30 @@ function setCachedResponse(key, data, ttl) {
  * Transform API errors to consistent format
  */
 function transformError(error) {
-  // If the error is already a standard Error with our custom properties, return it
-  if (error instanceof Error && error.status !== undefined) {
+  // If the error is already normalized by the bottom-layer axios instance
+  if (error && error.status !== undefined && error.message) {
     return error;
   }
 
-  let message = "An unexpected error occurred.";
-  let status = -1;
-  let data = null;
+  // Handle Axios error structure
+  const responseData = error.response?.data;
+  const message = responseData?.message || error.message || "An unexpected error occurred";
+  const status = error.response?.status ?? (error.request ? 0 : -1);
 
-  if (error.response) {
-    message = error.response.data?.message || error.message;
-    status = error.response.status;
-    data = error.response.data;
-  } else if (error.request) {
-    message =
-      "Network Error: No response from server. Check CORS or Backend status.";
-    status = 0;
-  } else {
-    message = error.message || "Request setup failed";
-  }
+  // Extract more technical details for "Status 0" debugging
+  const code = error.code || error.originalError?.code;
+  const syscall = error.syscall || error.originalError?.syscall;
 
-  const enhancedError = new Error(message);
+  const enhancedError = new Error(status === 0 ? `Network Error: ${code || 'Unknown'} (${message})` : message);
   enhancedError.status = status;
-  enhancedError.data = data;
-  enhancedError.originalError = error;
+  enhancedError.code = code;
+  enhancedError.syscall = syscall;
+  enhancedError.data = responseData || null;
+  enhancedError.config = (error.config || error.originalError?.config) ? {
+    url: error.config?.url || error.originalError?.config?.url,
+    method: error.config?.method || error.originalError?.config?.method,
+    params: error.config?.params || error.originalError?.config?.params
+  } : null;
 
   return enhancedError;
 }
@@ -150,8 +149,14 @@ apiClient.interceptors.request.use(
     }
 
     // Add Content-Type if not set (axios usually sets this automatically for objects)
-    // but explicit setting is safe.
-    if (!config.headers["Content-Type"]) {
+    // but explicit setting is safe EXCEPT for FormData where we want the browser to set it.
+    const isFormData = typeof FormData !== 'undefined' && config.data instanceof FormData;
+
+    if (isFormData) {
+      // CRITICAL: For FormData, we must DELETE the Content-Type header
+      // so Axios and the browser can correctly set it with the multipart boundary.
+      delete config.headers["Content-Type"];
+    } else if (!config.headers["Content-Type"]) {
       config.headers["Content-Type"] = "application/json";
     }
 

@@ -22,6 +22,7 @@
     "axois": "^0.0.1-security",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "firebase": "^12.10.0",
     "framer-motion": "^12.23.12",
     "i18next": "^25.4.2",
     "lucide-react": "^0.542.0",

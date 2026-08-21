@@ -2,8 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { IconButton, InputAdornment } from "@mui/material";
-import { HiEye, HiEyeOff } from "react-icons/hi";
 import FormWrapper from "../shared/FormWrapper";
 import { loginAction } from "@/actions/auth";
 
@@ -12,7 +10,6 @@ export default function LoginForm() {
     identifier: "", // can be email, phone or username
     password: "",
   });
-  const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const router = useRouter();
@@ -113,19 +110,10 @@ export default function LoginForm() {
         },
         {
           label: "Password",
-          type: showPassword ? "text" : "password",
+          type: "password",
           value: formData.password,
           onChange: (e) => handleChange("password", e.target.value),
           required: true,
-          InputProps: {
-            endAdornment: (
-              <InputAdornment position="end">
-                <IconButton onClick={() => setShowPassword(!showPassword)}>
-                  {showPassword ? <HiEyeOff /> : <HiEye />}
-                </IconButton>
-              </InputAdornment>
-            ),
-          },
         },
       ]}
     />

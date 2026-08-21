@@ -12,7 +12,6 @@ import {
   Check,
   Upload,
   Image as ImageIcon,
-  Image as ImageIcon,
 } from "lucide-react";
 
 const EditCategoryForm = ({ initialData }) => {
@@ -199,7 +198,7 @@ const EditCategoryForm = ({ initialData }) => {
       // Clear cache
       try {
         localStorage.removeItem("categories_cache_v1");
-      } catch (e) {}
+      } catch (e) { }
 
       showNotification({
         message: "Category updated successfully",
@@ -488,11 +487,10 @@ const EditCategoryForm = ({ initialData }) => {
                   type="button"
                   onClick={handlePrev}
                   disabled={currentStep === 1}
-                  className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-semibold transition-all ${
-                    currentStep === 1
+                  className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-semibold transition-all ${currentStep === 1
                       ? "bg-gray-100 text-gray-400 cursor-not-allowed"
                       : "border-2 border-[#d1d5db] hover:border-[#ff782d]"
-                  }`}
+                    }`}
                 >
                   <ChevronLeft size={20} /> Previous
                 </button>
@@ -527,11 +525,10 @@ const EditCategoryForm = ({ initialData }) => {
                 {steps.map((step) => (
                   <div key={step.id} className="flex items-start gap-4">
                     <div
-                      className={`w-14 h-14 rounded-full flex items-center justify-center font-semibold transition-all ${
-                        step.id <= currentStep
+                      className={`w-14 h-14 rounded-full flex items-center justify-center font-semibold transition-all ${step.id <= currentStep
                           ? "bg-[#ff782d] text-white"
                           : "bg-white border-2 border-[#d1d5db]"
-                      }`}
+                        }`}
                     >
                       {step.id < currentStep ? <Check size={24} /> : step.id}
                     </div>

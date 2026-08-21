@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 const SidebarContext = createContext();
 
 export function SidebarProvider({ children }) {
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
 
   // Load from localStorage
   useEffect(() => {

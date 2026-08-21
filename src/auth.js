@@ -3,6 +3,67 @@ import { authConfig } from "./auth.config";
 import Credentials from "next-auth/providers/credentials";
 import axios from "axios";
 
+/**
+ * Robust refresh token strategy.
+ * Attempts to refresh the access token using the refresh endpoint
+ * @param {object} token - The JWT token object
+ * @returns {Promise<object>} Updated token object with new access token or error
+ */
+async function refreshAccessToken(token) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
+  try {
+    const refreshUrl = `${process.env.NEXT_PUBLIC_API_URL}/auth/refresh`;
+    console.log(`[Auth] Attempting token refresh at: ${refreshUrl}`);
+
+    // We use fetch here to avoid interceptor side-effects during refresh
+    const res = await fetch(refreshUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Cookie: `refreshToken=${token.refreshToken}`,
+      },
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!res.ok) {
+      const errorText = await res.text().catch(() => "Unknown error");
+      console.error(
+        `[Auth] Refresh failed. Status: ${res.status}, Body: ${errorText}`
+      );
+      return { ...token, error: "RefreshAccessTokenError" };
+    }
+
+    const data = await res.json();
+    const expiresIn = data.expires_in || data.expiresIn || 7200; // default 2h
+    const newExpiresAt = Date.now() + parseInt(expiresIn) * 1000;
+
+    console.log(
+      `[Auth] Token refreshed successfully. New expiry in ${Math.round(
+        (newExpiresAt - Date.now()) / 1000
+      )}s`
+    );
+
+    return {
+      ...token,
+      accessToken: data.accessToken,
+      expiresAt: newExpiresAt,
+      error: null,
+    };
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error.name === "AbortError") {
+      console.error("[Auth] RefreshAccessTokenError: Request timed out after 10s");
+    } else {
+      console.error("[Auth] RefreshAccessTokenError", error.message);
+    }
+    return { ...token, error: "RefreshAccessTokenError" };
+  }
+}
+
 export const { auth, signIn, signOut, handlers } = NextAuth({
   secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
   ...authConfig,
@@ -77,57 +138,7 @@ export const { auth, signIn, signOut, handlers } = NextAuth({
       }
 
       // If token is expired or close to it, try to refresh
-      if (token.refreshToken) {
-        console.log(
-          `[Auth] Token expiring soon (${Math.round(timeUntilExpiry / 1000)}s), attempting refresh...`
-        );
-        try {
-          const response = await axios.post(
-            `${process.env.NEXT_PUBLIC_API_URL}/auth/refresh`,
-            {},
-            {
-              headers: {
-                Cookie: `refreshToken=${token.refreshToken}`,
-              },
-              withCredentials: true,
-            }
-          );
-
-          if (response.data && response.data.ok) {
-            const expiresIn =
-              response.data.expires_in || response.data.expiresIn || 2 * 60 * 60; // 2 hours
-            const expiresInSeconds = parseInt(expiresIn);
-            const newExpiresAt = Date.now() + expiresInSeconds * 1000;
-
-            console.log(
-              "[Auth] Token refreshed successfully. New expiry in",
-              Math.round((newExpiresAt - Date.now()) / 1000),
-              "seconds"
-            );
-            return {
-              ...token,
-              accessToken: response.data.accessToken,
-              expiresAt: newExpiresAt,
-              error: null,
-            };
-          } else {
-            console.warn(
-              "[Auth] Refresh failed - response not OK",
-              response.data
-            );
-            return { ...token, error: "RefreshAccessTokenError" };
-          }
-        } catch (error) {
-          console.error(
-            "[Auth] Refresh error:",
-            error.response?.data?.message || error.message
-          );
-          return { ...token, error: "RefreshAccessTokenError" };
-        }
-      } else {
-        console.warn("[Auth] No refresh token available, marking as expired");
-        return { ...token, error: "RefreshAccessTokenError" };
-      }
+      return refreshAccessToken(token);
     },
     async session({ session, token }) {
       if (process.env.NODE_ENV === "development") {

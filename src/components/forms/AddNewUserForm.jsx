@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Check, ChevronLeft, ChevronRight, Eye, EyeOff } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight } from "lucide-react";
 import UserService from "@/services/UserService";
 // Removed company/shop assignment logic — keep simple user creation
 import { useNotification } from "@/providers/NotificationProvider";
@@ -23,8 +23,6 @@ const AddNewUserForm = () => {
     firstName: "",
     lastName: "",
     email: "",
-    password: "",
-    confirmPassword: "",
 
     // Personal Details
     phone: "",
@@ -54,14 +52,12 @@ const AddNewUserForm = () => {
   });
 
   const [errors, setErrors] = useState({});
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const steps = [
     {
       id: 1,
       title: "Basic Info",
-      fields: ["firstName", "lastName", "email", "password", "confirmPassword"],
+      fields: ["firstName", "lastName", "email"],
     },
     {
       id: 2,
@@ -104,12 +100,6 @@ const AddNewUserForm = () => {
       if (!formData.email?.trim()) newErrors.email = "Email is required";
       else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email))
         newErrors.email = "Invalid email";
-
-      if (!formData.password) newErrors.password = "Password is required";
-      else if (formData.password.length < 8) newErrors.password = "Min 8 chars";
-
-      if (formData.password !== formData.confirmPassword)
-        newErrors.confirmPassword = "Passwords do not match";
     }
 
     // Step 2: Personal Details
@@ -169,7 +159,6 @@ const AddNewUserForm = () => {
       lastName: formData.lastName,
       email: formData.email,
       phone: formData.phone,
-      password: formData.password,
       gender: formData.gender,
       dateOfBirth: formData.dateOfBirth,
       nationalId: formData.nationalId,
@@ -247,11 +236,10 @@ const AddNewUserForm = () => {
         value={formData[field]}
         onChange={(e) => handleInputChange(field, e.target.value)}
         placeholder={placeholder}
-        className={`w-full px-4 py-3 rounded-2xl border-2 outline-none transition-all focus:border-[#ff782d] ${
-          errors[field]
-            ? "border-red-500"
-            : "border-[#d1d5db] hover:border-[#ff782d]"
-        } bg-white text-[#081422] placeholder-[#6b7280]`}
+        className={`w-full px-4 py-3 rounded-2xl border-2 outline-none transition-all focus:border-[#ff782d] ${errors[field]
+          ? "border-red-500"
+          : "border-[#d1d5db] hover:border-[#ff782d]"
+          } bg-white text-[#081422] placeholder-[#6b7280]`}
       />
       {errors[field] && (
         <p className="text-red-500 text-sm mt-1">{errors[field]}</p>
@@ -299,78 +287,6 @@ const AddNewUserForm = () => {
                       "e.g., company.admin@company.com",
                       true
                     )}
-
-                    <div className="relative">
-                      <label className="block text-sm font-semibold text-[#081422] mb-2">
-                        Password <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type={showPassword ? "text" : "password"}
-                        value={formData.password}
-                        onChange={(e) =>
-                          handleInputChange("password", e.target.value)
-                        }
-                        placeholder="Min 8 characters"
-                        className={`w-full px-4 py-3 rounded-2xl border-2 outline-none transition-all focus:border-[#ff782d] ${
-                          errors.password
-                            ? "border-red-500"
-                            : "border-[#d1d5db] hover:border-[#ff782d]"
-                        } bg-white text-[#081422]`}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-9 p-1 text-[#6b7280]"
-                      >
-                        {showPassword ? (
-                          <EyeOff size={18} />
-                        ) : (
-                          <Eye size={18} />
-                        )}
-                      </button>
-                      {errors.password && (
-                        <p className="text-red-500 text-sm mt-1">
-                          {errors.password}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="relative">
-                      <label className="block text-sm font-semibold text-[#081422] mb-2">
-                        Confirm Password <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type={showConfirmPassword ? "text" : "password"}
-                        value={formData.confirmPassword}
-                        onChange={(e) =>
-                          handleInputChange("confirmPassword", e.target.value)
-                        }
-                        placeholder="Repeat password"
-                        className={`w-full px-4 py-3 rounded-2xl border-2 outline-none transition-all focus:border-[#ff782d] ${
-                          errors.confirmPassword
-                            ? "border-red-500"
-                            : "border-[#d1d5db] hover:border-[#ff782d]"
-                        } bg-white text-[#081422]`}
-                      />
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setShowConfirmPassword(!showConfirmPassword)
-                        }
-                        className="absolute right-3 top-9 p-1 text-[#6b7280]"
-                      >
-                        {showConfirmPassword ? (
-                          <EyeOff size={18} />
-                        ) : (
-                          <Eye size={18} />
-                        )}
-                      </button>
-                      {errors.confirmPassword && (
-                        <p className="text-red-500 text-sm mt-1">
-                          {errors.confirmPassword}
-                        </p>
-                      )}
-                    </div>
                   </div>
                 )}
 
@@ -614,23 +530,21 @@ const AddNewUserForm = () => {
                 {steps.map((step) => (
                   <div key={step.id} className="flex items-start gap-4">
                     <div
-                      className={`w-14 h-14 rounded-full flex items-center justify-center font-semibold transition-all flex-shrink-0 ${
-                        step.id < currentStep
-                          ? "bg-[#ff782d] text-white"
-                          : step.id === currentStep
+                      className={`w-14 h-14 rounded-full flex items-center justify-center font-semibold transition-all flex-shrink-0 ${step.id < currentStep
+                        ? "bg-[#ff782d] text-white"
+                        : step.id === currentStep
                           ? "bg-[#ff782d] text-white border-4 border-[#fff8f5] ring-2 ring-[#ff782d]"
                           : "border-2 border-[#d1d5db] text-[#6b7280] bg-white"
-                      }`}
+                        }`}
                     >
                       {step.id < currentStep ? <Check size={24} /> : step.id}
                     </div>
                     <div className="pt-2">
                       <p
-                        className={`font-semibold text-sm transition-colors ${
-                          step.id <= currentStep
-                            ? "text-[#081422]"
-                            : "text-[#6b7280]"
-                        }`}
+                        className={`font-semibold text-sm transition-colors ${step.id <= currentStep
+                          ? "text-[#081422]"
+                          : "text-[#6b7280]"
+                          }`}
                       >
                         {step.title}
                       </p>

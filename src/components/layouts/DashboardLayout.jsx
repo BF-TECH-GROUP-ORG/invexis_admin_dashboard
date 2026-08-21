@@ -11,12 +11,11 @@ export default function DashboardLayout({ children }) {
     <div className="flex">
       <SideBar expanded={expanded} setExpanded={setExpanded} />
       <div
-        className={`flex-1 transition-all duration-300 ${
-          expanded ? "ml-64" : "ml-20"
-        }`}
+        className={`flex-1 transition-all duration-300 min-h-screen ${expanded ? "md:ml-[280px]" : "md:ml-[72px]"
+          }`}
       >
         <TopNavBar expanded={expanded} />
-        <main className="min-h-screen mt-30 p-6">{children}</main>
+        <main className="min-h-screen pt-20 px-4 md:px-8 pb-8">{children}</main>
       </div>
     </div>
   );
